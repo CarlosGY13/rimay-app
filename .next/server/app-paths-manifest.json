@@ -1,0 +1,6 @@
+{
+  "/inbox/page": "app/inbox/page.js",
+  "/onboarding/page": "app/onboarding/page.js",
+  "/portal/page": "app/portal/page.js",
+  "/sandbox/page": "app/sandbox/page.js"
+}

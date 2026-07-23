@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Scrollbar sutil y moderno */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ink-200;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-300;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* Campo de formulario base reutilizable */
+  .field-input {
+    @apply w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 shadow-soft outline-none transition
+      placeholder:text-ink-400
+      focus:border-brand-400 focus:ring-4 focus:ring-brand-100;
+  }
+}
+
+/* Animación de los puntos "escribiendo…" del Sandbox */
+@keyframes bounce2 {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+/* Fondo sutil tipo "producto caro": malla de luz muy tenue */
+.app-canvas {
+  background-color: #f7f8fb;
+  background-image:
+    radial-gradient(60rem 60rem at 110% -10%, rgb(99 102 241 / 0.06), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 0%, rgb(129 140 248 / 0.05), transparent 55%);
+}

@@ -1,0 +1,19 @@
+{
+  "negocio": "Pollería el Buen Sazón",
+  "rubro": "restaurante",
+  "moneda": "PEN",
+  "tarifa_delivery": 5.00,
+  "items": [
+    { "id": "combo_familiar", "nombre": "Combo familiar", "precio": 65.00 },
+    { "id": "cuarto_pollo", "nombre": "1/4 de pollo", "precio": 18.00 },
+    { "id": "medio_pollo", "nombre": "1/2 pollo", "precio": 32.00 }
+  ],
+  "extras": [
+    { "id": "aji_extra", "nombre": "Crema de ají extra", "precio": 2.00 },
+    { "id": "papas_extra", "nombre": "Porción extra de papas", "precio": 8.00 }
+  ],
+  "reglas": [
+    "Ensalada sin tomate no tiene costo adicional",
+    "Máximo 3 extras por pedido"
+  ]
+}
