@@ -38,3 +38,25 @@ npm install
 npm run dev      # servidor de desarrollo
 npm run build    # build de producción
 ```
+
+## Docker (desarrollo local con Postgres)
+
+La app se puede levantar dentro de Docker junto a una instancia de Postgres, ambos con un solo comando.
+
+1. Copia la plantilla de variables de entorno:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Levanta todo (construye la imagen de la app y arranca Postgres):
+
+   ```bash
+   docker compose up --build
+   ```
+
+3. Verifica que la app responde abriendo [http://localhost:3000](http://localhost:3000). Debería comportarse igual que con `npm run dev` (onboarding, portal, sandbox e inbox navegables).
+
+Los datos de Postgres persisten en un volumen nombrado (`postgres_data`): si haces `docker compose down` y luego `docker compose up` de nuevo, la base se conserva. Solo `docker compose down -v` borra el volumen.
+
+> **Nota:** en esta etapa Postgres queda levantado, saludable y disponible en `localhost:5432`, pero **la app todavía no lo usa**. La migración de la persistencia real (config del negocio y conversaciones) a Postgres es la siguiente tarea del roadmap. La variable `DATABASE_URL` ya queda definida en `.env` para que esa tarea la consuma directamente.

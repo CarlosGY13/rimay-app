@@ -1,0 +1,52 @@
+# docker-compose para desarrollo local de Rimay.
+# Levanta la app (Next.js) junto a una instancia de Postgres.
+# Los valores sensibles se leen del archivo .env (ver .env.example).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # Expuesto a localhost solo para inspección con un cliente de DB en dev.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - rimay
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      # Definida ya para que la Tarea 2 (persistencia) la consuma directamente.
+      # Todavía NO se usa desde el código.
+      DATABASE_URL: ${DATABASE_URL}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rimay
+
+volumes:
+  postgres_data:
+
+networks:
+  rimay:
+    driver: bridge

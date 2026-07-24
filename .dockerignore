@@ -1,0 +1,23 @@
+# dependencias e artefactos de build (se generan dentro de la imagen)
+node_modules
+.next
+out
+build
+
+# control de versiones y config de editor/herramientas
+.git
+.gitignore
+.kiro
+.vscode
+
+# variables de entorno (nunca deben viajar en la imagen)
+.env
+.env.*
+
+# archivos propios de docker y docs
+Dockerfile
+.dockerignore
+docker-compose.yml
+npm-debug.log*
+*.tsbuildinfo
+.DS_Store
