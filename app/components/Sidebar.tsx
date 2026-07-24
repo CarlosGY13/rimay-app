@@ -10,6 +10,7 @@ import {
   SlidersIcon,
   ChatIcon,
   InboxIcon,
+  SparklesIcon,
 } from "./icons";
 
 type NavItem = {
@@ -43,6 +44,12 @@ const NAV: NavItem[] = [
     label: "Inbox",
     descripcion: "Conversaciones",
     icon: InboxIcon,
+  },
+  {
+    href: "/resumen",
+    label: "Resumen",
+    descripcion: "Impacto de tu agente",
+    icon: SparklesIcon,
   },
 ];
 
