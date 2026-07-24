@@ -1,4 +1,4 @@
-import type { BusinessConfig, CatalogItem, Tono } from "./types";
+import type { BusinessConfig, CatalogItem, OrderSummary, Tono } from "./types";
 
 // Normaliza texto para comparar sin tildes ni mayúsculas.
 function normalizar(texto: string): string {
@@ -45,6 +45,25 @@ function detalleItem(item: CatalogItem): string {
   return `• ${item.nombre} — S/ ${item.precio.toFixed(2)}${extra}`;
 }
 
+// Palabras clave que activan needs_human_review
+const TRIGGER_HUMAN_REVIEW = [
+  "descuento",
+  "gratis",
+  "regalo",
+  "promo",
+  "queja",
+  "reclamo",
+  "devolucion",
+  "reembolso",
+];
+
+/** Resultado estructurado del agente mock. */
+export type AgentResponse = {
+  texto: string;
+  order: OrderSummary | null;
+  needs_human_review: boolean;
+};
+
 /**
  * MOCK: reemplazar con llamada real al AI core más adelante.
  *
@@ -56,24 +75,51 @@ function detalleItem(item: CatalogItem): string {
 export function generarRespuestaMock(
   mensaje: string,
   config: BusinessConfig
-): string {
+): AgentResponse {
+  const msgNorm = normalizar(mensaje);
+
+  // Detectar si necesita revisión humana
+  const needsReview = TRIGGER_HUMAN_REVIEW.some((t) => msgNorm.includes(t));
+
+  if (needsReview) {
+    return {
+      texto:
+        `${saludo(config.tono)}\n\n` +
+        `Entiendo tu consulta, pero necesito pasar esto a nuestro equipo para darte una respuesta adecuada. ` +
+        `Un momento, por favor.`,
+      order: null,
+      needs_human_review: true,
+    };
+  }
+
   const encontrados = buscarItems(mensaje, config.catalogo);
 
   if (encontrados.length > 0) {
     const lineas = encontrados.map(detalleItem).join("\n");
     const total = encontrados.reduce((sum, it) => sum + it.precio, 0);
-    return (
-      `${saludo(config.tono)}\n\n` +
-      `Esto es lo que tenemos disponible:\n${lineas}\n\n` +
-      `Total referencial: S/ ${total.toFixed(2)}. ` +
-      `¿Deseas confirmar el pedido?`
-    );
+    return {
+      texto:
+        `${saludo(config.tono)}\n\n` +
+        `Esto es lo que tenemos disponible:\n${lineas}\n\n` +
+        `Total referencial: S/ ${total.toFixed(2)}. ` +
+        `¿Deseas confirmar el pedido?`,
+      order: {
+        items: encontrados.map((it) => ({ nombre: it.nombre, precio: it.precio })),
+        total,
+        canal: "web",
+        needs_human_review: false,
+      },
+      needs_human_review: false,
+    };
   }
 
   // Sin coincidencias en el catálogo
-  return (
-    `${saludo(config.tono)}\n\n` +
-    `Mmm, no reconozco eso dentro de nuestro catálogo. ` +
-    `¿Podrías darme un poco más de detalle o decirme el nombre exacto de lo que buscas?`
-  );
+  return {
+    texto:
+      `${saludo(config.tono)}\n\n` +
+      `Mmm, no reconozco eso dentro de nuestro catálogo. ` +
+      `¿Podrías darme un poco más de detalle o decirme el nombre exacto de lo que buscas?`,
+    order: null,
+    needs_human_review: false,
+  };
 }
