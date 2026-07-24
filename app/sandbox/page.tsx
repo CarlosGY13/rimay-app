@@ -34,6 +34,9 @@ function SandboxContent() {
   const [confirmedOrder, setConfirmedOrder] = useState<OrderSummary | null>(null);
   const [humanReview, setHumanReview] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
+  // MOCK: recuerda el último texto escalado a inbox para no duplicar si el
+  // cliente repite exactamente el mismo mensaje sin coincidencia seguido.
+  const ultimoEscaladoRef = useRef<string | null>(null);
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,6 +103,21 @@ function SandboxContent() {
           setHumanReview(true);
           setPendingOrder(null);
         }
+        // MOCK: si el bot no reconoció el mensaje, escalar la conversación al
+        // inbox como "revisión". Dedup: saltar si repite el mismo texto.
+        if (response.sinCoincidencia) {
+          if (ultimoEscaladoRef.current !== contenido) {
+            ultimoEscaladoRef.current = contenido;
+            addConversacion({
+              cliente: "Cliente web",
+              resumen: contenido,
+              total: 0,
+              minutosAtras: 0,
+              canal: "web",
+              estado: "revision",
+            });
+          }
+        }
       }
       setEscribiendo(false);
     }, delay);
@@ -112,6 +130,7 @@ function SandboxContent() {
     setPendingOrder(null);
     setConfirmedOrder(null);
     setHumanReview(false);
+    ultimoEscaladoRef.current = null;
   }
 
   return (

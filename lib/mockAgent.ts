@@ -62,6 +62,9 @@ export type AgentResponse = {
   texto: string;
   order: OrderSummary | null;
   needs_human_review: boolean;
+  // MOCK: true solo cuando el mensaje no coincide con nada del catálogo,
+  // para que el sandbox pueda escalar la conversación al inbox.
+  sinCoincidencia: boolean;
 };
 
 /**
@@ -89,6 +92,7 @@ export function generarRespuestaMock(
         `Un momento, por favor.`,
       order: null,
       needs_human_review: true,
+      sinCoincidencia: false, // MOCK: hay coincidencia de palabra clave, no es no-match
     };
   }
 
@@ -110,6 +114,7 @@ export function generarRespuestaMock(
         needs_human_review: false,
       },
       needs_human_review: false,
+      sinCoincidencia: false, // MOCK: se encontraron ítems del catálogo
     };
   }
 
@@ -121,5 +126,6 @@ export function generarRespuestaMock(
       `¿Podrías darme un poco más de detalle o decirme el nombre exacto de lo que buscas?`,
     order: null,
     needs_human_review: false,
+    sinCoincidencia: true, // MOCK: no se reconoció nada del catálogo → escalar a inbox
   };
 }
