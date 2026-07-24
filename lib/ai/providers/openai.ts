@@ -1,10 +1,10 @@
 import OpenAI from "openai";
 import type { AIProvider, AIRequest, AIResponse } from "../provider";
-import { buildBasicPrompt } from "../prompt";
+import { buildSystemPrompt } from "../prompt";
+import { OPENAI_RESPONSE_SCHEMA, parseStructuredResponse } from "../schema";
 
-// Adaptador de OpenAI. Lee la API key de OPENAI_API_KEY (nunca hardcodeada).
-// Por ahora arma un prompt básico y devuelve la respuesta del modelo tal
-// cual, sin parsing estructurado (eso llega en la Tarea 5).
+// Adaptador de OpenAI. Lee la API key de OPENAI_API_KEY (nunca hardcodeada) y
+// usa structured outputs (json_schema) para forzar la forma de la respuesta.
 export class OpenAIProvider implements AIProvider {
   private client: OpenAI;
   private model: string;
@@ -21,22 +21,38 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async generateResponse(input: AIRequest): Promise<AIResponse> {
-    const prompt = buildBasicPrompt(input);
+    const system = buildSystemPrompt(input.business);
+
+    // Historial: user -> "user"; agente/operador -> "assistant".
+    const historial = input.history.map((m) => ({
+      role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+      content: m.content,
+    }));
 
     const completion = await this.client.chat.completions.create({
       model: this.model,
       messages: [
-        {
-          role: "system",
-          content:
-            "Eres un asistente de atención al cliente para pequeños negocios.",
-        },
-        { role: "user", content: prompt },
+        { role: "system", content: system },
+        ...historial,
+        { role: "user", content: input.message },
       ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "rimay_response",
+          strict: true,
+          schema: OPENAI_RESPONSE_SCHEMA,
+        },
+      },
     });
 
-    const text = completion.choices[0]?.message?.content ?? "";
+    const raw = completion.choices[0]?.message?.content ?? "";
+    const parsed = parseStructuredResponse(raw);
 
-    return { text, needsHumanReview: false };
+    return {
+      text: parsed.reply,
+      needsHumanReview: parsed.needsHumanReview,
+      reviewReason: parsed.reviewReason,
+    };
   }
 }

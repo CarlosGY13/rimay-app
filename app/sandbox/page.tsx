@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import RequireConfig from "@/app/components/RequireConfig";
 import PageHeader from "@/app/components/PageHeader";
 import { useBusiness } from "@/app/context/BusinessContext";
-import { generarRespuestaMock, type AgentResponse } from "@/lib/mockAgent";
-import type { ChatMessage, OrderSummary } from "@/lib/types";
+import type { ChatMessage } from "@/lib/types";
+import type { AIMessage } from "@/lib/ai/provider";
 import { Button } from "@/app/components/ui/Button";
 import {
   SendIcon,
@@ -13,10 +13,6 @@ import {
   CheckIcon,
   AlertIcon,
 } from "@/app/components/icons";
-
-// Duración consistente para el feedback de "escribiendo…" del agente,
-// alineada con el tono breve del toast de guardado del portal.
-const FEEDBACK_DELAY_MS = 900;
 
 function mensajeInicial(nombre: string): ChatMessage {
   const negocio = nombre.trim().length > 0 ? nombre.trim() : "nuestro negocio";
@@ -27,6 +23,12 @@ function mensajeInicial(nombre: string): ChatMessage {
   };
 }
 
+type SandboxReply = {
+  reply: string;
+  needsHumanReview: boolean;
+  reviewReason: string | null;
+};
+
 function SandboxContent() {
   const { config, addConversacion } = useBusiness();
   const [mensajes, setMensajes] = useState<ChatMessage[]>([
@@ -34,21 +36,24 @@ function SandboxContent() {
   ]);
   const [texto, setTexto] = useState("");
   const [escribiendo, setEscribiendo] = useState(false);
-  const [pendingOrder, setPendingOrder] = useState<OrderSummary | null>(null);
-  const [confirmedOrder, setConfirmedOrder] = useState<OrderSummary | null>(null);
   const [humanReview, setHumanReview] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
-  // MOCK: recuerda el último texto escalado a inbox para no duplicar si el
-  // cliente repite exactamente el mismo mensaje sin coincidencia seguido.
+  // Recuerda el último texto escalado a inbox para no duplicar si el cliente
+  // repite exactamente el mismo mensaje sin resolución seguido.
   const ultimoEscaladoRef = useRef<string | null>(null);
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [mensajes, escribiendo, confirmedOrder, humanReview]);
+  }, [mensajes, escribiendo, humanReview]);
 
-  function enviar() {
+  async function enviar() {
     const contenido = texto.trim();
     if (contenido.length === 0 || escribiendo) return;
+
+    // Historial previo (antes de este mensaje) para dar contexto al modelo.
+    const historial: AIMessage[] = mensajes
+      .filter((m) => m.id !== "welcome")
+      .map((m) => ({ role: m.role, content: m.texto }));
 
     const msgUsuario: ChatMessage = {
       id: `u-${Date.now()}`,
@@ -59,79 +64,54 @@ function SandboxContent() {
     setTexto("");
     setEscribiendo(true);
 
-    // Check if user is confirming a pending order
-    const msgNorm = contenido.toLowerCase();
-    const esConfirmacion =
-      pendingOrder &&
-      (msgNorm.includes("sí") ||
-        msgNorm.includes("si") ||
-        msgNorm.includes("confirmo") ||
-        msgNorm.includes("dale") ||
-        msgNorm.includes("ok") ||
-        msgNorm.includes("confirmar"));
+    let data: SandboxReply;
+    try {
+      const res = await fetch("/api/sandbox/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: contenido, history: historial }),
+      });
+      data = (await res.json()) as SandboxReply;
+    } catch {
+      // El endpoint ya cae a un fallback seguro; esto cubre un error de red.
+      data = {
+        reply: "Dame un momento, ya te ayudo.",
+        needsHumanReview: true,
+        reviewReason: "Error de red al contactar al asistente.",
+      };
+    }
 
-    setTimeout(() => {
-      if (esConfirmacion && pendingOrder) {
-        // Confirm the order
-        setConfirmedOrder(pendingOrder);
-        setPendingOrder(null);
-        // Push to inbox
+    setMensajes((prev) => [
+      ...prev,
+      { id: `a-${Date.now()}`, role: "agent", texto: data.reply },
+    ]);
+
+    if (data.needsHumanReview) {
+      setHumanReview(true);
+      // Escalar a inbox como "revisión", guardando el motivo en el resumen.
+      // Dedup: saltar si repite el mismo mensaje sin resolución.
+      if (ultimoEscaladoRef.current !== contenido) {
+        ultimoEscaladoRef.current = contenido;
         addConversacion({
-          cliente: "Cliente sandbox",
-          resumen: pendingOrder.items.map((i) => i.nombre).join(", "),
-          total: pendingOrder.total,
+          cliente: "Cliente web",
+          resumen: data.reviewReason ?? contenido,
+          total: 0,
           minutosAtras: 0,
           canal: "web",
-          estado: "nuevo",
+          estado: "revision",
         });
-        setMensajes((prev) => [
-          ...prev,
-          {
-            id: `a-${Date.now()}`,
-            role: "agent",
-            texto: "¡Perfecto! Tu pedido ha sido confirmado. Te llegará un resumen al canal correspondiente. 🎉",
-          },
-        ]);
-      } else {
-        const response: AgentResponse = generarRespuestaMock(contenido, config);
-        setMensajes((prev) => [
-          ...prev,
-          { id: `a-${Date.now()}`, role: "agent", texto: response.texto },
-        ]);
-        if (response.order) {
-          setPendingOrder(response.order);
-          setConfirmedOrder(null);
-        }
-        if (response.needs_human_review) {
-          setHumanReview(true);
-          setPendingOrder(null);
-        }
-        // MOCK: si el bot no reconoció el mensaje, escalar la conversación al
-        // inbox como "revisión". Dedup: saltar si repite el mismo texto.
-        if (response.sinCoincidencia) {
-          if (ultimoEscaladoRef.current !== contenido) {
-            ultimoEscaladoRef.current = contenido;
-            addConversacion({
-              cliente: "Cliente web",
-              resumen: contenido,
-              total: 0,
-              minutosAtras: 0,
-              canal: "web",
-              estado: "revision",
-            });
-          }
-        }
       }
-      setEscribiendo(false);
-    }, FEEDBACK_DELAY_MS);
+    } else {
+      setHumanReview(false);
+    }
+
+    setEscribiendo(false);
   }
 
   function reiniciar() {
     setMensajes([mensajeInicial(config.nombre)]);
     setEscribiendo(false);
     setTexto("");
-    setPendingOrder(null);
-    setConfirmedOrder(null);
     setHumanReview(false);
     ultimoEscaladoRef.current = null;
   }
@@ -200,9 +180,6 @@ function SandboxContent() {
             </div>
           )}
 
-          {/* Order confirmed card */}
-          {confirmedOrder && <OrderCard order={confirmedOrder} />}
-
           <div ref={finRef} />
         </div>
 
@@ -231,41 +208,6 @@ function SandboxContent() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function OrderCard({ order }: { order: OrderSummary }) {
-  return (
-    <div className="animate-slide-up mx-auto w-full max-w-sm rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-soft">
-      <div className="mb-3 flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100">
-          <CheckIcon className="h-4 w-4 text-emerald-700" />
-        </div>
-        <span className="text-sm font-semibold text-emerald-800">
-          Pedido confirmado
-        </span>
-      </div>
-      <ul className="mb-3 space-y-1.5">
-        {order.items.map((item, i) => (
-          <li
-            key={i}
-            className="flex items-center justify-between text-sm text-ink-700"
-          >
-            <span>{item.nombre}</span>
-            <span className="font-medium">S/ {item.precio.toFixed(2)}</span>
-          </li>
-        ))}
-      </ul>
-      <div className="flex items-center justify-between border-t border-emerald-100 pt-2">
-        <span className="text-sm font-semibold text-ink-900">Total</span>
-        <span className="text-base font-bold text-emerald-700">
-          S/ {order.total.toFixed(2)}
-        </span>
-      </div>
-      <p className="mt-2 text-center text-[11px] text-ink-400">
-        Este pedido fue enviado al inbox del negocio
-      </p>
     </div>
   );
 }

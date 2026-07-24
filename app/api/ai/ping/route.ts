@@ -16,6 +16,7 @@ export async function GET() {
       history: [],
       business: {
         nombre: "Rimay",
+        rubro: "generico",
         tono: "cercano",
         catalogo: [],
         reglas: [],

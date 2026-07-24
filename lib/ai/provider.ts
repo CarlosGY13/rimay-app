@@ -24,11 +24,17 @@ export type AICatalogItem = {
   nombre: string;
   precio: number;
   descripcion?: string;
+  // Atributos específicos por rubro (persistidos como JSON en la Tarea 2/3).
+  categoria?: string;
+  tallas?: string[];
+  color?: string;
+  duracion?: string;
 };
 
 // Contexto del negocio (persistido en Postgres desde la Tarea 3).
 export type AIBusinessContext = {
   nombre: string;
+  rubro: string;
   tono: Tono;
   catalogo: AICatalogItem[];
   reglas: string[];
@@ -44,11 +50,13 @@ export type AIRequest = {
 };
 
 export type AIResponse = {
-  // Texto de respuesta generado por el modelo.
+  // Texto de respuesta que se le muestra al cliente.
   text: string;
-  // Si la consulta debería escalar a un humano. La lógica real detrás de
-  // este flag la completa la Tarea 5; acá siempre viene en false.
+  // Si la consulta debe escalar a un humano (decidido por el modelo).
   needsHumanReview: boolean;
+  // Motivo de la escalada (solo cuando needsHumanReview es true), para que
+  // el operador entienda por qué sin leer todo el historial.
+  reviewReason: string | null;
 };
 
 export interface AIProvider {
