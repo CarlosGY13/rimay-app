@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState, type ComponentType, type SVGProps } from "react";
+import { useCallback, useEffect, useMemo, useState, type ComponentType, type SVGProps } from "react";
 import RequireConfig from "@/app/components/RequireConfig";
 import PageHeader from "@/app/components/PageHeader";
 import { useBusiness } from "@/app/context/BusinessContext";
-import { getInboxEjemplo } from "@/lib/mockInbox";
+import { useInboxMetrics } from "./useInboxMetrics";
+import { MetricsPanel } from "./MetricsPanel";
+import { HandoffPanel } from "./HandoffPanel";
 import type {
   Conversacion,
   EstadoConversacion,
@@ -65,11 +67,44 @@ function iniciales(nombre: string): string {
 }
 
 function InboxContent() {
-  const { config } = useBusiness();
-  const [conversaciones, setConversaciones] = useState<Conversacion[]>(() =>
-    getInboxEjemplo(config.rubro!)
-  );
+  const { conversaciones: contextConvs } = useBusiness();
+  const [localOverrides, setLocalOverrides] = useState<
+    Record<string, Partial<Conversacion>>
+  >({});
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [webConvs, setWebConvs] = useState<Conversacion[]>([]);
+  const [panelSessionId, setPanelSessionId] = useState<string | null>(null);
+
+  // Poll /api/conversations every 3s for widget messages
+  const fetchWebConvs = useCallback(async () => {
+    try {
+      const res = await fetch("/api/conversations");
+      if (res.ok) {
+        const data = await res.json();
+        setWebConvs(data.conversations ?? []);
+      }
+    } catch {
+      // silent fail — polling will retry
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWebConvs();
+    const interval = setInterval(fetchWebConvs, 3000);
+    return () => clearInterval(interval);
+  }, [fetchWebConvs]);
+
+  // Merge context conversations + web widget conversations (deduplicate by id)
+  const conversaciones: Conversacion[] = useMemo(() => {
+    const contextWithOverrides = contextConvs.map((c) =>
+      localOverrides[c.id] ? { ...c, ...localOverrides[c.id] } : c
+    );
+    const contextIds = new Set(contextWithOverrides.map((c) => c.id));
+    const uniqueWeb = webConvs.filter((c) => !contextIds.has(c.id));
+    return [...contextWithOverrides, ...uniqueWeb];
+  }, [contextConvs, localOverrides, webConvs]);
+
+  const metrics = useInboxMetrics(conversaciones);
 
   const visibles = useMemo(() => {
     const lista =
@@ -82,15 +117,19 @@ function InboxContent() {
   const conteoRevision = conversaciones.filter(
     (c) => c.estado === "revision"
   ).length;
-  const conteoNuevos = conversaciones.filter(
-    (c) => c.estado === "nuevo"
-  ).length;
 
   function tomarChat(id: string) {
-    // MOCK: solo cambia el estado visual, no hay handoff real.
-    setConversaciones((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, estado: "preparacion" } : c))
-    );
+    // For web conversations, open the handoff panel
+    const isWebConv = webConvs.some((c) => c.id === id);
+    if (isWebConv) {
+      setPanelSessionId(id);
+    } else {
+      // For context conversations (sandbox), just change state visually
+      setLocalOverrides((prev) => ({
+        ...prev,
+        [id]: { estado: "preparacion" },
+      }));
+    }
   }
 
   return (
@@ -101,12 +140,8 @@ function InboxContent() {
         description="Pedidos y mensajes entrantes de todos tus canales."
       />
 
-      {/* Métricas rápidas */}
-      <div className="mb-6 grid grid-cols-3 gap-3">
-        <Metric label="Activas" valor={conversaciones.length} />
-        <Metric label="Nuevas" valor={conteoNuevos} tone="info" />
-        <Metric label="Por revisar" valor={conteoRevision} tone="danger" />
-      </div>
+      {/* Métricas operativas */}
+      <MetricsPanel metrics={metrics} />
 
       {/* Filtros */}
       <div className="mb-5 flex flex-wrap gap-2">
@@ -206,6 +241,15 @@ function InboxContent() {
                           Tomar el chat
                         </Button>
                       )}
+                      {conv.canal === "web" && !requiereRevision && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setPanelSessionId(conv.id)}
+                        >
+                          Ver chat
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -214,31 +258,14 @@ function InboxContent() {
           })}
         </ul>
       )}
-    </div>
-  );
-}
 
-function Metric({
-  label,
-  valor,
-  tone = "neutral",
-}: {
-  label: string;
-  valor: number;
-  tone?: "neutral" | "info" | "danger";
-}) {
-  const color =
-    tone === "danger"
-      ? "text-red-600"
-      : tone === "info"
-        ? "text-brand-600"
-        : "text-ink-900";
-  return (
-    <div className="rounded-2xl border border-ink-200/70 bg-white p-4 shadow-card">
-      <div className={`text-2xl font-semibold tracking-tight ${color}`}>
-        {valor}
-      </div>
-      <div className="mt-0.5 text-xs font-medium text-ink-400">{label}</div>
+      {/* Handoff Panel */}
+      {panelSessionId && (
+        <HandoffPanel
+          sessionId={panelSessionId}
+          onClose={() => setPanelSessionId(null)}
+        />
+      )}
     </div>
   );
 }

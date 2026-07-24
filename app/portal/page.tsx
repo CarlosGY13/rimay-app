@@ -15,13 +15,13 @@ import {
   PencilIcon,
   TrashIcon,
   CheckIcon,
-  UploadIcon,
   WhatsappIcon,
   InstagramIcon,
   FacebookIcon,
   GlobeIcon,
 } from "@/app/components/icons";
 import ItemModal from "./ItemModal";
+import MenuDropZone from "./MenuDropZone";
 
 const TONOS: { value: Tono; label: string }[] = [
   { value: "cercano", label: "Cercano y cálido" },
@@ -52,7 +52,6 @@ function PortalContent() {
     addRegla,
     updateRegla,
     removeRegla,
-    setCartaFileName,
     guardado,
     save,
   } = useBusiness();
@@ -162,12 +161,15 @@ function PortalContent() {
           </div>
         </SectionCard>
 
+        {/* ---- Carga rápida de carta ---- */}
+        <MenuDropZone />
+
         {/* ---- Catálogo ---- */}
         <SectionCard
           title={rubroDef.catalogoLabel}
           description={`${config.catalogo.length} ${
             config.catalogo.length === 1 ? "ítem" : "ítems"
-          } en tu catálogo`}
+          } en tu catálogo · o agrégalos a mano`}
           action={
             <Button size="sm" onClick={abrirNuevo}>
               <PlusIcon className="h-4 w-4" />
@@ -269,32 +271,7 @@ function PortalContent() {
           </div>
         </SectionCard>
 
-        {/* ---- Carta visual ---- */}
-        <SectionCard
-          title="Carta o catálogo visual"
-          description="Sube una foto de tu carta. (Demo: solo mostramos el nombre del archivo.)"
-        >
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 bg-ink-50/40 px-6 py-8 text-center transition-colors hover:border-brand-300 hover:bg-brand-50/40">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-ink-400 shadow-soft ring-1 ring-ink-200/60">
-              <UploadIcon className="h-5 w-5" />
-            </span>
-            <span className="text-sm font-medium text-ink-700">
-              {config.cartaFileName ?? "Haz clic para subir una imagen o PDF"}
-            </span>
-            <span className="text-xs text-ink-400">
-              PNG, JPG o PDF · hasta 10MB
-            </span>
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                setCartaFileName(file ? file.name : null);
-              }}
-            />
-          </label>
-        </SectionCard>
+
       </div>
 
       {/* ---- Barra de guardado ---- */}

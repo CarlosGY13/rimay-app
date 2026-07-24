@@ -11,11 +11,13 @@ import {
 import type {
   BusinessConfig,
   CatalogItem,
+  Conversacion,
   Rubro,
   Tono,
   Canales,
 } from "@/lib/types";
 import { crearConfigInicial } from "@/lib/rubros";
+import { getInboxEjemplo } from "@/lib/mockInbox";
 
 const CONFIG_VACIA: BusinessConfig = {
   rubro: null,
@@ -46,6 +48,9 @@ type BusinessContextValue = {
   removeRegla: (index: number) => void;
   // carta visual
   setCartaFileName: (nombre: string | null) => void;
+  // conversaciones (inbox)
+  conversaciones: Conversacion[];
+  addConversacion: (conv: Omit<Conversacion, "id">) => void;
   // guardado
   guardado: boolean;
   save: () => void;
@@ -60,9 +65,11 @@ function generarId(): string {
 export function BusinessProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<BusinessConfig>(CONFIG_VACIA);
   const [guardado, setGuardado] = useState(false);
+  const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
 
   const selectRubro = useCallback((rubro: Rubro) => {
     setConfig(crearConfigInicial(rubro));
+    setConversaciones(getInboxEjemplo(rubro));
     setGuardado(false);
   }, []);
 
@@ -129,6 +136,13 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     setConfig((prev) => ({ ...prev, cartaFileName: nombre }));
   }, []);
 
+  const addConversacion = useCallback((conv: Omit<Conversacion, "id">) => {
+    setConversaciones((prev) => [
+      { ...conv, id: generarId() },
+      ...prev,
+    ]);
+  }, []);
+
   const save = useCallback(() => {
     // MOCK: no hay persistencia real. Solo confirmamos visualmente.
     setGuardado(true);
@@ -150,11 +164,14 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       updateRegla,
       removeRegla,
       setCartaFileName,
+      conversaciones,
+      addConversacion,
       guardado,
       save,
     }),
     [
       config,
+      conversaciones,
       guardado,
       selectRubro,
       setNombre,
@@ -167,6 +184,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       updateRegla,
       removeRegla,
       setCartaFileName,
+      addConversacion,
       save,
     ]
   );

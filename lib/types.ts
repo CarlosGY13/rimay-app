@@ -81,3 +81,14 @@ export type ChatMessage = {
   role: ChatRole;
   texto: string;
 };
+
+// ============================================================
+// Resumen de orden (generado por el Sandbox)
+// ============================================================
+
+export type OrderSummary = {
+  items: { nombre: string; precio: number }[];
+  total: number;
+  canal: CanalOrigen;
+  needs_human_review: boolean;
+};

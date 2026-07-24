@@ -4,10 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import RequireConfig from "@/app/components/RequireConfig";
 import PageHeader from "@/app/components/PageHeader";
 import { useBusiness } from "@/app/context/BusinessContext";
-import { generarRespuestaMock } from "@/lib/mockAgent";
-import type { ChatMessage } from "@/lib/types";
+import { generarRespuestaMock, type AgentResponse } from "@/lib/mockAgent";
+import type { ChatMessage, OrderSummary } from "@/lib/types";
 import { Button } from "@/app/components/ui/Button";
-import { SendIcon, SparklesIcon, CheckIcon } from "@/app/components/icons";
+import {
+  SendIcon,
+  SparklesIcon,
+  CheckIcon,
+  AlertIcon,
+} from "@/app/components/icons";
 
 function mensajeInicial(nombre: string): ChatMessage {
   const negocio = nombre.trim().length > 0 ? nombre.trim() : "nuestro negocio";
@@ -19,17 +24,20 @@ function mensajeInicial(nombre: string): ChatMessage {
 }
 
 function SandboxContent() {
-  const { config } = useBusiness();
+  const { config, addConversacion } = useBusiness();
   const [mensajes, setMensajes] = useState<ChatMessage[]>([
     mensajeInicial(config.nombre),
   ]);
   const [texto, setTexto] = useState("");
   const [escribiendo, setEscribiendo] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<OrderSummary | null>(null);
+  const [confirmedOrder, setConfirmedOrder] = useState<OrderSummary | null>(null);
+  const [humanReview, setHumanReview] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [mensajes, escribiendo]);
+  }, [mensajes, escribiendo, confirmedOrder, humanReview]);
 
   function enviar() {
     const contenido = texto.trim();
@@ -44,14 +52,55 @@ function SandboxContent() {
     setTexto("");
     setEscribiendo(true);
 
-    // MOCK: delay artificial para simular "el agente está escribiendo".
+    // Check if user is confirming a pending order
+    const msgNorm = contenido.toLowerCase();
+    const esConfirmacion =
+      pendingOrder &&
+      (msgNorm.includes("sí") ||
+        msgNorm.includes("si") ||
+        msgNorm.includes("confirmo") ||
+        msgNorm.includes("dale") ||
+        msgNorm.includes("ok") ||
+        msgNorm.includes("confirmar"));
+
     const delay = 800 + Math.random() * 400;
     setTimeout(() => {
-      const respuesta = generarRespuestaMock(contenido, config);
-      setMensajes((prev) => [
-        ...prev,
-        { id: `a-${Date.now()}`, role: "agent", texto: respuesta },
-      ]);
+      if (esConfirmacion && pendingOrder) {
+        // Confirm the order
+        setConfirmedOrder(pendingOrder);
+        setPendingOrder(null);
+        // Push to inbox
+        addConversacion({
+          cliente: "Cliente sandbox",
+          resumen: pendingOrder.items.map((i) => i.nombre).join(", "),
+          total: pendingOrder.total,
+          minutosAtras: 0,
+          canal: "web",
+          estado: "nuevo",
+        });
+        setMensajes((prev) => [
+          ...prev,
+          {
+            id: `a-${Date.now()}`,
+            role: "agent",
+            texto: "¡Perfecto! Tu pedido ha sido confirmado. Te llegará un resumen al canal correspondiente. 🎉",
+          },
+        ]);
+      } else {
+        const response: AgentResponse = generarRespuestaMock(contenido, config);
+        setMensajes((prev) => [
+          ...prev,
+          { id: `a-${Date.now()}`, role: "agent", texto: response.texto },
+        ]);
+        if (response.order) {
+          setPendingOrder(response.order);
+          setConfirmedOrder(null);
+        }
+        if (response.needs_human_review) {
+          setHumanReview(true);
+          setPendingOrder(null);
+        }
+      }
       setEscribiendo(false);
     }, delay);
   }
@@ -60,6 +109,9 @@ function SandboxContent() {
     setMensajes([mensajeInicial(config.nombre)]);
     setEscribiendo(false);
     setTexto("");
+    setPendingOrder(null);
+    setConfirmedOrder(null);
+    setHumanReview(false);
   }
 
   return (
@@ -90,6 +142,24 @@ function SandboxContent() {
           </div>
         </div>
 
+        {/* Human review banner */}
+        {humanReview && (
+          <div className="flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-5 py-3">
+            <AlertIcon className="h-5 w-5 shrink-0 text-amber-600" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800">
+                Requiere revisión humana
+              </p>
+              <p className="text-xs text-amber-600">
+                El agente no puede resolver esta consulta automáticamente. Un operador debe intervenir.
+              </p>
+            </div>
+            <span className="rounded-full bg-amber-200 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+              needs_human_review
+            </span>
+          </div>
+        )}
+
         {/* Mensajes */}
         <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
           {mensajes.map((msg) => (
@@ -105,6 +175,9 @@ function SandboxContent() {
               </div>
             </div>
           )}
+
+          {/* Order confirmed card */}
+          {confirmedOrder && <OrderCard order={confirmedOrder} />}
 
           <div ref={finRef} />
         </div>
@@ -134,6 +207,41 @@ function SandboxContent() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function OrderCard({ order }: { order: OrderSummary }) {
+  return (
+    <div className="animate-slide-up mx-auto w-full max-w-sm rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-soft">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100">
+          <CheckIcon className="h-4 w-4 text-emerald-700" />
+        </div>
+        <span className="text-sm font-semibold text-emerald-800">
+          Pedido confirmado
+        </span>
+      </div>
+      <ul className="mb-3 space-y-1.5">
+        {order.items.map((item, i) => (
+          <li
+            key={i}
+            className="flex items-center justify-between text-sm text-ink-700"
+          >
+            <span>{item.nombre}</span>
+            <span className="font-medium">S/ {item.precio.toFixed(2)}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center justify-between border-t border-emerald-100 pt-2">
+        <span className="text-sm font-semibold text-ink-900">Total</span>
+        <span className="text-base font-bold text-emerald-700">
+          S/ {order.total.toFixed(2)}
+        </span>
+      </div>
+      <p className="mt-2 text-center text-[11px] text-ink-400">
+        Este pedido fue enviado al inbox del negocio
+      </p>
     </div>
   );
 }
