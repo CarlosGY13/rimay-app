@@ -23,6 +23,10 @@ RUN apk add --no-cache openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# NEXT_PUBLIC_* se inlinea en el bundle durante el build, así que el token del
+# operador (Tarea 6) debe estar disponible como build arg, no solo en runtime.
+ARG NEXT_PUBLIC_OPERATOR_TOKEN
+ENV NEXT_PUBLIC_OPERATOR_TOKEN=$NEXT_PUBLIC_OPERATOR_TOKEN
 # Genera el Prisma Client para que el type-check de `next build` encuentre
 # los tipos de @prisma/client (lo importa lib/db.ts). La app todavía no lo usa
 # en runtime; eso llega en la Tarea 3.

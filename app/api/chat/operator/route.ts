@@ -4,8 +4,13 @@ import {
   addMessage,
   pauseSession,
 } from "@/lib/conversationStore";
+import { requireOperator } from "@/lib/operatorAuth";
 
 export async function POST(request: Request) {
+  // Ruta sensible: requiere el token de operador (Tarea 6).
+  const unauthorized = requireOperator(request);
+  if (unauthorized) return unauthorized;
+
   try {
     const body = await request.json();
     const { sessionId, message } = body as {

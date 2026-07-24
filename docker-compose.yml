@@ -28,6 +28,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Token de operador inyectado en el bundle en tiempo de build (Tarea 6).
+        NEXT_PUBLIC_OPERATOR_TOKEN: ${NEXT_PUBLIC_OPERATOR_TOKEN:-}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -42,6 +45,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      # Token de operador para validar las rutas sensibles en runtime (Tarea 6).
+      OPERATOR_TOKEN: ${OPERATOR_TOKEN:-}
     ports:
       - "${APP_PORT:-3000}:3000"
     depends_on:

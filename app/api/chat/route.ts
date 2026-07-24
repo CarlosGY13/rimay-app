@@ -8,6 +8,7 @@ import {
 } from "@/lib/conversationStore";
 import type { BusinessConfig } from "@/lib/types";
 import catalogData from "@/data/catalog.json";
+import { enforceRateLimit } from "@/lib/rateLimit";
 
 // Build a BusinessConfig from the static catalog.json for server-side use.
 const SERVER_CONFIG: BusinessConfig = {
@@ -32,6 +33,10 @@ const SERVER_CONFIG: BusinessConfig = {
 };
 
 export async function POST(request: Request) {
+  // Chat público: sin token de operador, pero con rate limiting por IP.
+  const limited = enforceRateLimit(request);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { sessionId, message } = body as {

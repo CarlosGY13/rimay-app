@@ -14,6 +14,18 @@ type Props = {
   onClose: () => void;
 };
 
+// ⚠️ TEMPORAL (Tarea 6): token de operador compartido enviado con cada acción
+// sensible. Va inyectado en el bundle (NEXT_PUBLIC_*), así que es un candado
+// simple, no un login. Se reemplaza por sesiones reales en la Tarea 7.
+const OPERATOR_TOKEN = process.env.NEXT_PUBLIC_OPERATOR_TOKEN ?? "";
+
+function operatorHeaders(): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    "x-operator-token": OPERATOR_TOKEN,
+  };
+}
+
 export function HandoffPanel({ sessionId, onClose }: Props) {
   const [mensajes, setMensajes] = useState<Message[]>([]);
   const [paused, setPaused] = useState(false);
@@ -30,7 +42,7 @@ export function HandoffPanel({ sessionId, onClose }: Props) {
         hasPaused.current = true;
         await fetch("/api/chat/operator", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: operatorHeaders(),
           body: JSON.stringify({ sessionId, message: null }),
         });
       }
@@ -73,7 +85,7 @@ export function HandoffPanel({ sessionId, onClose }: Props) {
     try {
       const res = await fetch("/api/chat/operator", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: operatorHeaders(),
         body: JSON.stringify({ sessionId, message: contenido }),
       });
       if (res.ok) {
@@ -93,7 +105,7 @@ export function HandoffPanel({ sessionId, onClose }: Props) {
     try {
       await fetch("/api/chat/release", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: operatorHeaders(),
         body: JSON.stringify({ sessionId }),
       });
     } catch {

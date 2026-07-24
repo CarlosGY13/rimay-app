@@ -8,6 +8,7 @@ import {
 } from "@/lib/tenant";
 import { generarRespuestaIA } from "@/lib/ai/engine";
 import type { AIMessage, AIBusinessContext } from "@/lib/ai/provider";
+import { enforceRateLimit } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,11 @@ const MAX_HISTORY = 10;
 // llama al proveedor configurado (OpenAI/Gemini) con salida estructurada y
 // devuelve { reply, needsHumanReview, reviewReason }.
 export async function POST(request: Request) {
+  // Chat público (alimenta el sandbox): rate limiting por IP para no gastar
+  // crédito de la API de IA de forma abusiva.
+  const limited = enforceRateLimit(request);
+  if (limited) return limited;
+
   try {
     const body = (await request.json()) as {
       message?: string;
