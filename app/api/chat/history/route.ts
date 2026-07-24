@@ -28,5 +28,8 @@ export async function GET(request: Request) {
     mensajes: session.mensajes,
     estado: session.estado,
     paused: session.paused,
+    // Motivo/resumen (p. ej. por qué se escaló a revisión). Útil cuando la
+    // conversación no tiene mensajes (caso escalado desde el sandbox).
+    resumen: session.resumen,
   });
 }

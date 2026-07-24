@@ -23,6 +23,7 @@ function operatorHeaders(): HeadersInit {
 export function HandoffPanel({ sessionId, onClose }: Props) {
   const [mensajes, setMensajes] = useState<Message[]>([]);
   const [paused, setPaused] = useState(false);
+  const [resumen, setResumen] = useState<string>("");
   const [texto, setTexto] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -46,6 +47,7 @@ export function HandoffPanel({ sessionId, onClose }: Props) {
         const data = await res.json();
         setMensajes(data.mensajes ?? []);
         setPaused(data.paused ?? false);
+        setResumen(data.resumen ?? "");
       }
     } catch {
       // silent
@@ -144,6 +146,16 @@ export function HandoffPanel({ sessionId, onClose }: Props) {
           </div>
         )}
 
+        {/* Motivo de la escalada / resumen del caso */}
+        {resumen && (
+          <div className="border-b border-ink-100 bg-ink-50/60 px-5 py-3">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-ink-400">
+              Motivo del caso
+            </p>
+            <p className="mt-0.5 text-sm text-ink-700">{resumen}</p>
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
           {loading && (
@@ -151,7 +163,11 @@ export function HandoffPanel({ sessionId, onClose }: Props) {
           )}
 
           {!loading && mensajes.length === 0 && (
-            <p className="text-center text-sm text-ink-400">Sin mensajes aún.</p>
+            <p className="mx-auto max-w-[85%] rounded-xl border border-dashed border-ink-200 px-4 py-6 text-center text-sm text-ink-400">
+              Este caso se escaló para revisión y no tiene chat con un cliente en
+              vivo. Revisá el motivo de arriba; podés dejar una nota escribiendo
+              abajo o devolverlo a la IA.
+            </p>
           )}
 
           {mensajes.map((msg, i) => (

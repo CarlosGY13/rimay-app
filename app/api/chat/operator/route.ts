@@ -67,6 +67,7 @@ export async function POST(request: Request) {
       mensajes: updated.mensajes,
       estado: updated.estado,
       paused: updated.paused,
+      resumen: updated.resumen,
     });
   } catch {
     return NextResponse.json(
