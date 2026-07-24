@@ -155,7 +155,9 @@ function SandboxContent() {
           </div>
           <div className="leading-tight">
             <div className="text-sm font-semibold text-ink-900">
-              Agente Rimay
+              {config.nombre.trim().length > 0
+                ? config.nombre.trim()
+                : "Tu agente"}
             </div>
             <div className="text-xs text-emerald-600">En línea</div>
           </div>

@@ -24,6 +24,11 @@ export default function Home() {
             Configurar mi agente
           </Link>
         </div>
+
+        <p className="mt-12 text-xs text-ink-400">
+          <span className="font-medium text-ink-500">Rimay</span> significa
+          &laquo;hablar&raquo; en quechua.
+        </p>
       </div>
     </main>
   );
