@@ -1,7 +1,30 @@
+import {
+  Channel as DbChannel,
+  ConversationStatus as DbStatus,
+  type Conversation,
+  type Message,
+} from "@prisma/client";
+import { prisma } from "./db";
+import {
+  getFixedTenantId,
+  senderToRole,
+  roleToSender,
+  dbEstadoToApp,
+  type WidgetRole,
+} from "./tenant";
 import type { EstadoConversacion } from "./types";
 
+// ============================================================
+// Store de conversaciones — respaldado por Postgres (tabla Conversation
+// + Message) a través de Prisma. Reemplaza al Map en memoria anterior.
+//
+// La forma pública (WidgetSession) y los nombres de las funciones se
+// mantienen para no romper a las rutas que ya las consumen; la única
+// diferencia es que ahora son asíncronas.
+// ============================================================
+
 export type WidgetMessage = {
-  role: "user" | "agent" | "operator";
+  role: WidgetRole;
   texto: string;
 };
 
@@ -15,83 +38,112 @@ export type WidgetSession = {
   updatedAt: number;
 };
 
-// Module-level Map — persists while the Next.js server process runs.
-const sessions = new Map<string, WidgetSession>();
-
-function generateId(): string {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
-
-export function getOrCreateSession(sessionId?: string): WidgetSession {
-  if (sessionId && sessions.has(sessionId)) {
-    return sessions.get(sessionId)!;
-  }
-  const id = sessionId ?? generateId();
-  const session: WidgetSession = {
-    id,
-    mensajes: [],
-    resumen: "",
-    total: 0,
-    estado: "nuevo",
-    paused: false,
-    updatedAt: Date.now(),
+function toWidgetSession(
+  conv: Conversation & { messages: Message[] }
+): WidgetSession {
+  return {
+    id: conv.id,
+    mensajes: conv.messages.map((m) => ({
+      role: senderToRole(m.sender),
+      texto: m.content,
+    })),
+    resumen: conv.summary ?? "",
+    total: conv.totalAmount ? Number(conv.totalAmount) : 0,
+    estado: dbEstadoToApp(conv.status),
+    // "pausado" (operador en control) se deriva del estado en_preparacion.
+    paused: conv.status === DbStatus.en_preparacion,
+    updatedAt: conv.updatedAt.getTime(),
   };
-  sessions.set(id, session);
-  return session;
 }
 
-export function getSession(sessionId: string): WidgetSession | undefined {
-  return sessions.get(sessionId);
+export async function getOrCreateSession(
+  sessionId?: string
+): Promise<WidgetSession> {
+  if (sessionId) {
+    const existing = await prisma.conversation.findUnique({
+      where: { id: sessionId },
+      include: { messages: { orderBy: { createdAt: "asc" } } },
+    });
+    if (existing) return toWidgetSession(existing);
+  }
+
+  const tenantId = await getFixedTenantId();
+  const created = await prisma.conversation.create({
+    data: {
+      tenantId,
+      customerName: "Cliente web",
+      channel: DbChannel.web,
+      status: DbStatus.nuevo,
+      summary: "",
+    },
+    include: { messages: true },
+  });
+  return toWidgetSession(created);
 }
 
-export function addMessage(
+export async function getSession(
+  sessionId: string
+): Promise<WidgetSession | undefined> {
+  const conv = await prisma.conversation.findUnique({
+    where: { id: sessionId },
+    include: { messages: { orderBy: { createdAt: "asc" } } },
+  });
+  return conv ? toWidgetSession(conv) : undefined;
+}
+
+export async function addMessage(
   sessionId: string,
-  role: "user" | "agent" | "operator",
+  role: WidgetRole,
   texto: string
-): void {
-  const session = sessions.get(sessionId);
-  if (!session) return;
-  session.mensajes.push({ role, texto });
-  session.updatedAt = Date.now();
+): Promise<void> {
+  await prisma.message.create({
+    data: { conversationId: sessionId, sender: roleToSender(role), content: texto },
+  });
+  // Toca la conversación para refrescar updatedAt (orden del inbox).
+  await prisma.conversation.update({
+    where: { id: sessionId },
+    data: { updatedAt: new Date() },
+  });
 }
 
-export function markNeedsReview(sessionId: string): void {
-  const session = sessions.get(sessionId);
-  if (!session) return;
-  session.estado = "revision";
-  session.updatedAt = Date.now();
+export async function markNeedsReview(sessionId: string): Promise<void> {
+  await prisma.conversation.update({
+    where: { id: sessionId },
+    data: { status: DbStatus.requiere_revision },
+  });
 }
 
-export function pauseSession(sessionId: string): void {
-  const session = sessions.get(sessionId);
-  if (!session) return;
-  session.paused = true;
-  session.estado = "preparacion";
-  session.updatedAt = Date.now();
+export async function pauseSession(sessionId: string): Promise<void> {
+  await prisma.conversation.update({
+    where: { id: sessionId },
+    data: { status: DbStatus.en_preparacion },
+  });
 }
 
-export function releaseSession(sessionId: string): void {
-  const session = sessions.get(sessionId);
-  if (!session) return;
-  session.paused = false;
-  session.estado = "completado";
-  session.updatedAt = Date.now();
+export async function releaseSession(sessionId: string): Promise<void> {
+  await prisma.conversation.update({
+    where: { id: sessionId },
+    data: { status: DbStatus.completado },
+  });
 }
 
-export function updateOrderInfo(
+export async function updateOrderInfo(
   sessionId: string,
   resumen: string,
   total: number
-): void {
-  const session = sessions.get(sessionId);
-  if (!session) return;
-  session.resumen = resumen;
-  session.total = total;
-  session.updatedAt = Date.now();
+): Promise<void> {
+  await prisma.conversation.update({
+    where: { id: sessionId },
+    data: { summary: resumen, totalAmount: total },
+  });
 }
 
-export function getAllSessions(): WidgetSession[] {
-  return Array.from(sessions.values()).sort(
-    (a, b) => b.updatedAt - a.updatedAt
-  );
+export async function getAllSessions(): Promise<WidgetSession[]> {
+  const tenantId = await getFixedTenantId();
+  const convs = await prisma.conversation.findMany({
+    where: { tenantId },
+    include: { messages: { orderBy: { createdAt: "asc" } } },
+    orderBy: { updatedAt: "desc" },
+  });
+  return convs.map(toWidgetSession);
 }

@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
     if (!session) {
       return NextResponse.json(
         { error: "Sesión no encontrada." },
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       );
     }
 
-    releaseSession(sessionId);
+    await releaseSession(sessionId);
 
     return NextResponse.json({ success: true });
   } catch {

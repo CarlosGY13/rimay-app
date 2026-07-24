@@ -15,6 +15,7 @@ import {
   PencilIcon,
   TrashIcon,
   CheckIcon,
+  AlertIcon,
   WhatsappIcon,
   InstagramIcon,
   FacebookIcon,
@@ -51,8 +52,11 @@ function PortalContent() {
     removeItem,
     addRegla,
     updateRegla,
+    persistRegla,
     removeRegla,
     guardado,
+    saveError,
+    actionError,
     save,
   } = useBusiness();
 
@@ -244,6 +248,7 @@ function PortalContent() {
                   <Textarea
                     value={regla}
                     onChange={(e) => updateRegla(index, e.target.value)}
+                    onBlur={() => persistRegla(index)}
                     rows={2}
                     className="flex-1 border-0 bg-transparent p-0 shadow-none focus:ring-0"
                   />
@@ -288,6 +293,11 @@ function PortalContent() {
               <CheckIcon className="h-3.5 w-3.5" />
               Configuración guardada
             </Badge>
+          ) : saveError || actionError ? (
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600">
+              <AlertIcon className="h-4 w-4" />
+              {actionError ?? "No se pudo guardar. Intenta de nuevo."}
+            </span>
           ) : (
             <span className="text-sm text-ink-400">
               Los cambios se reflejan en el Sandbox y el Inbox.

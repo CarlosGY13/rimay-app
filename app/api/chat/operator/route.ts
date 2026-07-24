@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
     if (!session) {
       return NextResponse.json(
         { error: "Sesión no encontrada." },
@@ -30,19 +30,22 @@ export async function POST(request: Request) {
 
     // Pause AI if not already paused
     if (!session.paused) {
-      pauseSession(sessionId);
+      await pauseSession(sessionId);
     }
 
     // If message is provided, add it to history
     if (message && message.trim().length > 0) {
-      addMessage(sessionId, "operator", message.trim());
+      await addMessage(sessionId, "operator", message.trim());
     }
 
+    // Re-lee el estado actualizado (mensajes + paused) para devolverlo.
+    const updated = (await getSession(sessionId)) ?? session;
+
     return NextResponse.json({
-      sessionId: session.id,
-      mensajes: session.mensajes,
-      estado: session.estado,
-      paused: session.paused,
+      sessionId: updated.id,
+      mensajes: updated.mensajes,
+      estado: updated.estado,
+      paused: updated.paused,
     });
   } catch {
     return NextResponse.json(

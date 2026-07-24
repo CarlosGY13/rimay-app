@@ -46,8 +46,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const session = getOrCreateSession(sessionId);
-    addMessage(session.id, "user", message.trim());
+    const session = await getOrCreateSession(sessionId);
+    await addMessage(session.id, "user", message.trim());
 
     // If session is paused (operator took over), store message but don't auto-respond.
     if (session.paused) {
@@ -62,15 +62,15 @@ export async function POST(request: Request) {
 
     const response = generarRespuestaMock(message.trim(), SERVER_CONFIG);
 
-    addMessage(session.id, "agent", response.texto);
+    await addMessage(session.id, "agent", response.texto);
 
     if (response.needs_human_review) {
-      markNeedsReview(session.id);
+      await markNeedsReview(session.id);
     }
 
     if (response.order) {
       const resumen = response.order.items.map((i) => i.nombre).join(", ");
-      updateOrderInfo(session.id, resumen, response.order.total);
+      await updateOrderInfo(session.id, resumen, response.order.total);
     }
 
     return NextResponse.json({
