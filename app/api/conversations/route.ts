@@ -1,28 +1,22 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import {
-  getFixedTenant,
-  dbConversationToApp,
-  appEstadoToDb,
-  appCanalToDb,
-} from "@/lib/tenant";
+import { dbConversationToApp, appEstadoToDb, appCanalToDb } from "@/lib/tenant";
+import { requireSession } from "@/lib/auth/session";
 import type { Conversacion } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-// Lista todas las conversaciones del tenant fijo (widget + sandbox), mapeadas
-// a la forma que consume el inbox.
+// Lista las conversaciones del tenant de la sesión (widget + sandbox).
 export async function GET() {
+  const { session, response } = await requireSession();
+  if (response) return response;
   try {
-    const tenant = await getFixedTenant();
     const convs = await prisma.conversation.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId: session.tenantId },
       include: { messages: { orderBy: { createdAt: "asc" } } },
       orderBy: { updatedAt: "desc" },
     });
-
-    const conversations = convs.map(dbConversationToApp);
-    return NextResponse.json({ conversations });
+    return NextResponse.json({ conversations: convs.map(dbConversationToApp) });
   } catch (e) {
     console.error("GET /api/conversations failed:", e);
     return NextResponse.json(
@@ -32,15 +26,16 @@ export async function GET() {
   }
 }
 
-// Crea una conversación (usado por el sandbox: pedido confirmado o escalada).
+// Crea una conversación (sandbox: pedido confirmado o escalada a revisión).
 export async function POST(request: Request) {
+  const { session, response } = await requireSession();
+  if (response) return response;
   try {
     const body = (await request.json()) as Omit<Conversacion, "id">;
 
-    const tenant = await getFixedTenant();
     const created = await prisma.conversation.create({
       data: {
-        tenantId: tenant.id,
+        tenantId: session.tenantId,
         customerName: body.cliente || "Cliente web",
         channel: appCanalToDb(body.canal ?? "web"),
         status: appEstadoToDb(body.estado ?? "nuevo"),

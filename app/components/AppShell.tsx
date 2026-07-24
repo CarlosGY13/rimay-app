@@ -7,8 +7,8 @@ import Sidebar from "./Sidebar";
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  // La landing (/) se muestra a pantalla completa, sin el Sidebar del panel.
-  if (pathname === "/") {
+  // La landing (/) y el login se muestran a pantalla completa, sin el Sidebar.
+  if (pathname === "/" || pathname === "/login") {
     return <div className="app-canvas min-h-screen">{children}</div>;
   }
 

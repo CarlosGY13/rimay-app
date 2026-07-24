@@ -81,6 +81,17 @@ export async function getOrCreateSession(
   return toWidgetSession(created);
 }
 
+// Devuelve el tenantId dueño de una conversación (o null si no existe).
+export async function conversationTenantId(
+  sessionId: string
+): Promise<string | null> {
+  const conv = await prisma.conversation.findUnique({
+    where: { id: sessionId },
+    select: { tenantId: true },
+  });
+  return conv?.tenantId ?? null;
+}
+
 export async function getSession(
   sessionId: string
 ): Promise<WidgetSession | undefined> {

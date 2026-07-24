@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
-  getFixedTenant,
   appRubroToDb,
   dbRubroToApp,
   appTonoToDb,
@@ -9,22 +8,23 @@ import {
   dbCatalogItemToApp,
   appCatalogAttributes,
 } from "@/lib/tenant";
+import { requireSession } from "@/lib/auth/session";
 import { crearConfigInicial } from "@/lib/rubros";
 import type { Rubro, Tono } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-// Devuelve el tenant fijo con su catálogo y reglas, en la forma que consume
-// el BusinessContext (rubro/tono en valores de la app; reglas con id).
-async function loadBusiness() {
-  const tenant = await getFixedTenant();
-  const [catalogo, reglas] = await Promise.all([
+// Devuelve el negocio del tenant de la sesión con su catálogo y reglas, en la
+// forma que consume el BusinessContext (rubro/tono en valores de la app).
+async function loadBusiness(tenantId: string) {
+  const [tenant, catalogo, reglas] = await Promise.all([
+    prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } }),
     prisma.catalogItem.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId },
       orderBy: { createdAt: "asc" },
     }),
     prisma.businessRule.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId },
       orderBy: { createdAt: "asc" },
     }),
   ]);
@@ -39,9 +39,10 @@ async function loadBusiness() {
 }
 
 export async function GET() {
+  const { session, response } = await requireSession();
+  if (response) return response;
   try {
-    const business = await loadBusiness();
-    return NextResponse.json(business);
+    return NextResponse.json(await loadBusiness(session.tenantId));
   } catch (e) {
     console.error("GET /api/business failed:", e);
     return NextResponse.json(
@@ -53,6 +54,8 @@ export async function GET() {
 
 // Actualiza datos básicos del negocio: nombre, rubro, tono.
 export async function PATCH(request: Request) {
+  const { session, response } = await requireSession();
+  if (response) return response;
   try {
     const body = (await request.json()) as {
       nombre?: string;
@@ -60,9 +63,8 @@ export async function PATCH(request: Request) {
       tono?: Tono;
     };
 
-    const tenant = await getFixedTenant();
     await prisma.tenant.update({
-      where: { id: tenant.id },
+      where: { id: session.tenantId },
       data: {
         ...(body.nombre !== undefined ? { name: body.nombre } : {}),
         ...(body.rubro !== undefined ? { rubro: appRubroToDb(body.rubro) } : {}),
@@ -70,7 +72,7 @@ export async function PATCH(request: Request) {
       },
     });
 
-    return NextResponse.json(await loadBusiness());
+    return NextResponse.json(await loadBusiness(session.tenantId));
   } catch (e) {
     console.error("PATCH /api/business failed:", e);
     return NextResponse.json(
@@ -81,9 +83,10 @@ export async function PATCH(request: Request) {
 }
 
 // Onboarding: fija el rubro y reemplaza catálogo + reglas con el set de
-// ejemplo de ese rubro (equivalente a lo que hacía crearConfigInicial en
-// memoria), todo en una transacción.
+// ejemplo de ese rubro, todo en una transacción.
 export async function PUT(request: Request) {
+  const { session, response } = await requireSession();
+  if (response) return response;
   try {
     const body = (await request.json()) as { rubro?: Rubro };
     if (!body.rubro) {
@@ -93,14 +96,14 @@ export async function PUT(request: Request) {
       );
     }
 
-    const tenant = await getFixedTenant();
+    const tenantId = session.tenantId;
     const ejemplo = crearConfigInicial(body.rubro);
 
     await prisma.$transaction([
-      prisma.catalogItem.deleteMany({ where: { tenantId: tenant.id } }),
-      prisma.businessRule.deleteMany({ where: { tenantId: tenant.id } }),
+      prisma.catalogItem.deleteMany({ where: { tenantId } }),
+      prisma.businessRule.deleteMany({ where: { tenantId } }),
       prisma.tenant.update({
-        where: { id: tenant.id },
+        where: { id: tenantId },
         data: {
           rubro: appRubroToDb(body.rubro),
           tono: appTonoToDb(ejemplo.tono),
@@ -108,7 +111,7 @@ export async function PUT(request: Request) {
       }),
       prisma.catalogItem.createMany({
         data: ejemplo.catalogo.map((item) => ({
-          tenantId: tenant.id,
+          tenantId,
           name: item.nombre,
           price: item.precio,
           description: item.descripcion ?? null,
@@ -116,11 +119,11 @@ export async function PUT(request: Request) {
         })),
       }),
       prisma.businessRule.createMany({
-        data: ejemplo.reglas.map((text) => ({ tenantId: tenant.id, text })),
+        data: ejemplo.reglas.map((text) => ({ tenantId, text })),
       }),
     ]);
 
-    return NextResponse.json(await loadBusiness());
+    return NextResponse.json(await loadBusiness(tenantId));
   } catch (e) {
     console.error("PUT /api/business failed:", e);
     return NextResponse.json(

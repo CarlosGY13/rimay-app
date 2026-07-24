@@ -70,8 +70,28 @@ model Tenant {
   catalogItems  CatalogItem[]
   businessRules BusinessRule[]
   conversations Conversation[]
+  user          User?
 
   @@map("tenants")
+}
+
+// ------------------------------------------------------------
+// User: dueño del negocio (uno por tenant, por ahora).
+// El login/selección por usuario reemplaza al "tenant fijo".
+// ------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  // Relación uno a uno: un dueño por negocio (tenant_id único).
+  tenantId     String   @unique @map("tenant_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("users")
 }
 
 // ------------------------------------------------------------

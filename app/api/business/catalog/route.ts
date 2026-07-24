@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import {
-  getFixedTenant,
-  dbCatalogItemToApp,
-  appCatalogAttributes,
-} from "@/lib/tenant";
+import { dbCatalogItemToApp, appCatalogAttributes } from "@/lib/tenant";
+import { requireSession } from "@/lib/auth/session";
 import type { CatalogItem } from "@/lib/types";
 
-// Crea un ítem de catálogo para el tenant fijo.
+// Crea un ítem de catálogo para el tenant de la sesión.
 export async function POST(request: Request) {
+  const { session, response } = await requireSession();
+  if (response) return response;
   try {
     const body = (await request.json()) as Omit<CatalogItem, "id">;
 
@@ -19,10 +18,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const tenant = await getFixedTenant();
     const created = await prisma.catalogItem.create({
       data: {
-        tenantId: tenant.id,
+        tenantId: session.tenantId,
         name: body.nombre,
         price: body.precio,
         description: body.descripcion ?? null,

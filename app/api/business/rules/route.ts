@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getFixedTenant } from "@/lib/tenant";
+import { requireSession } from "@/lib/auth/session";
 
-// Crea una regla de negocio para el tenant fijo.
+// Crea una regla de negocio para el tenant de la sesión.
 export async function POST(request: Request) {
+  const { session, response } = await requireSession();
+  if (response) return response;
   try {
     const body = (await request.json()) as { text?: string };
     const text = body.text?.trim();
@@ -15,9 +17,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const tenant = await getFixedTenant();
     const created = await prisma.businessRule.create({
-      data: { tenantId: tenant.id, text },
+      data: { tenantId: session.tenantId, text },
     });
 
     return NextResponse.json(

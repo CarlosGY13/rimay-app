@@ -83,3 +83,26 @@ Los scripts equivalentes en `package.json` (`npm run db:migrate`, `db:seed`, `db
 > **Nota de red local:** si corrés Prisma directamente desde el host (`npm run db:migrate`) y tu WSL/Docker no expone el contenedor en `localhost` (por ejemplo si ya tenés otro Postgres ocupando el 5432), usá el comando de arriba dentro de la red de Docker, que no depende de la red del host.
 
 El seed crea un tenant de ejemplo (**Sabores del Valle**, rubro restaurante) con 4 ítems de catálogo y 2 reglas, replicando los datos mock del rubro restaurante.
+
+## Autenticación (login por negocio)
+
+El panel (`/portal`, `/sandbox`, `/inbox`, `/onboarding`) requiere iniciar sesión. La landing (`/`) es pública.
+
+**Credenciales del usuario de desarrollo** (creado por el seed):
+
+- Correo: `dueno@saboresdelvalle.pe`
+- Contraseña: `rimay1234`
+
+Ingresá en [http://localhost:3000/login](http://localhost:3000/login). Un login exitoso lleva al Portal (o al Onboarding si el negocio todavía no tiene catálogo).
+
+### Cómo funciona la sesión
+
+Se eligió **JWT firmado con `jose` guardado en una cookie httpOnly**, en vez de NextAuth, porque:
+
+- Es liviano y no necesita adaptador ni tabla de sesiones en la base de datos.
+- `jose` funciona tanto en el runtime Node (route handlers) como en el Edge (middleware), así que el mismo mecanismo protege las páginas (en `middleware.ts`) y valida las rutas API.
+- El alcance actual (un dueño, una cuenta, un tenant) no justifica el peso de NextAuth.
+
+La sesión guarda `userId` y `tenantId`; cada ruta API lee el `tenantId` de la sesión (ya no hay "tenant fijo" hardcodeado). Las contraseñas se hashean con `bcryptjs`.
+
+> El secreto de firma se configura en `SESSION_SECRET` (ver `.env.example`). En el piloto local la cookie va sin `secure` porque corre sobre `http://localhost`; detrás de HTTPS debe activarse `secure`.

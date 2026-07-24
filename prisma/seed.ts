@@ -1,6 +1,11 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+// Credenciales del usuario de desarrollo (documentadas en el README).
+const DEV_USER_EMAIL = "dueno@saboresdelvalle.pe";
+const DEV_USER_PASSWORD = "rimay1234";
 
 // Datos semilla para desarrollo: un tenant de ejemplo (rubro restaurante)
 // que replica el catálogo y las reglas mock que ya existen hoy en el código
@@ -67,11 +72,20 @@ async function main() {
     ],
   });
 
+  // Usuario dueño del negocio (idempotente por email). Contraseña hasheada.
+  const passwordHash = await bcrypt.hash(DEV_USER_PASSWORD, 10);
+  await prisma.user.upsert({
+    where: { email: DEV_USER_EMAIL },
+    update: { passwordHash, tenantId: tenant.id },
+    create: { email: DEV_USER_EMAIL, passwordHash, tenantId: tenant.id },
+  });
+
   const items = await prisma.catalogItem.count({ where: { tenantId: tenant.id } });
   const rules = await prisma.businessRule.count({ where: { tenantId: tenant.id } });
   console.log(
     `Seed OK: tenant "${tenant.name}" (${tenant.slug}) con ${items} ítems y ${rules} reglas.`
   );
+  console.log(`Usuario de desarrollo: ${DEV_USER_EMAIL} / ${DEV_USER_PASSWORD}`);
 }
 
 main()

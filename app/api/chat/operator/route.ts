@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import {
-  getSession,
+  getSession as getConversation,
   addMessage,
   pauseSession,
+  conversationTenantId,
 } from "@/lib/conversationStore";
-import { requireOperator } from "@/lib/operatorAuth";
+import { requireSession } from "@/lib/auth/session";
 
 export async function POST(request: Request) {
-  // Ruta sensible: requiere el token de operador (Tarea 6).
-  const unauthorized = requireOperator(request);
-  if (unauthorized) return unauthorized;
+  // Ruta sensible: requiere sesión de dueño y que la conversación sea suya.
+  const { session, response } = await requireSession();
+  if (response) return response;
 
   try {
     const body = await request.json();
@@ -25,26 +26,41 @@ export async function POST(request: Request) {
       );
     }
 
-    const session = await getSession(sessionId);
-    if (!session) {
+    // La conversación debe pertenecer al tenant de la sesión.
+    const ownerTenant = await conversationTenantId(sessionId);
+    if (!ownerTenant) {
       return NextResponse.json(
-        { error: "Sesión no encontrada." },
+        { error: "Conversación no encontrada." },
+        { status: 404 }
+      );
+    }
+    if (ownerTenant !== session.tenantId) {
+      return NextResponse.json(
+        { error: "No autorizado para esta conversación." },
+        { status: 403 }
+      );
+    }
+
+    const conv = await getConversation(sessionId);
+    if (!conv) {
+      return NextResponse.json(
+        { error: "Conversación no encontrada." },
         { status: 404 }
       );
     }
 
-    // Pause AI if not already paused
-    if (!session.paused) {
+    // Pausa la IA si no lo estaba.
+    if (!conv.paused) {
       await pauseSession(sessionId);
     }
 
-    // If message is provided, add it to history
+    // Si viene un mensaje del operador, lo agrega al historial.
     if (message && message.trim().length > 0) {
       await addMessage(sessionId, "operator", message.trim());
     }
 
     // Re-lee el estado actualizado (mensajes + paused) para devolverlo.
-    const updated = (await getSession(sessionId)) ?? session;
+    const updated = (await getConversation(sessionId)) ?? conv;
 
     return NextResponse.json({
       sessionId: updated.id,

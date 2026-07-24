@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSession, releaseSession } from "@/lib/conversationStore";
-import { requireOperator } from "@/lib/operatorAuth";
+import { releaseSession, conversationTenantId } from "@/lib/conversationStore";
+import { requireSession } from "@/lib/auth/session";
 
 export async function POST(request: Request) {
-  // Ruta sensible: requiere el token de operador (Tarea 6).
-  const unauthorized = requireOperator(request);
-  if (unauthorized) return unauthorized;
+  // Ruta sensible: requiere sesión de dueño y que la conversación sea suya.
+  const { session, response } = await requireSession();
+  if (response) return response;
 
   try {
     const body = await request.json();
@@ -18,11 +18,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const session = await getSession(sessionId);
-    if (!session) {
+    const ownerTenant = await conversationTenantId(sessionId);
+    if (!ownerTenant) {
       return NextResponse.json(
-        { error: "Sesión no encontrada." },
+        { error: "Conversación no encontrada." },
         { status: 404 }
+      );
+    }
+    if (ownerTenant !== session.tenantId) {
+      return NextResponse.json(
+        { error: "No autorizado para esta conversación." },
+        { status: 403 }
       );
     }
 

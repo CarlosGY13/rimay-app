@@ -18,12 +18,15 @@
   "dependencies": {
     "@google/genai": "^1.0.0",
     "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.4",
     "next": "14.2.18",
     "openai": "^6.49.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "20.17.9",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",

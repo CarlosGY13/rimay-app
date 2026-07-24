@@ -11,6 +11,7 @@ import {
   ChatIcon,
   InboxIcon,
   SparklesIcon,
+  LogoutIcon,
 } from "./icons";
 
 type NavItem = {
@@ -63,6 +64,16 @@ function iniciales(nombre: string): string {
 export default function Sidebar() {
   const pathname = usePathname();
   const { config } = useBusiness();
+
+  async function cerrarSesion() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // aunque falle, forzamos la salida
+    }
+    // Recarga completa para limpiar el estado en memoria del BusinessContext.
+    window.location.href = "/login";
+  }
 
   const nombreNegocio =
     config.nombre.trim().length > 0 ? config.nombre.trim() : "Mi negocio";
@@ -145,7 +156,15 @@ export default function Sidebar() {
       </nav>
 
       {/* Pie */}
-      <div className="border-t border-ink-200/70 px-5 py-4">
+      <div className="space-y-3 border-t border-ink-200/70 px-5 py-4">
+        <button
+          type="button"
+          onClick={cerrarSesion}
+          className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-100/70 hover:text-ink-900"
+        >
+          <LogoutIcon className="h-4 w-4" />
+          Cerrar sesión
+        </button>
         <div className="flex items-center gap-2 text-[11px] font-medium text-ink-400">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
           Entorno demo · datos simulados

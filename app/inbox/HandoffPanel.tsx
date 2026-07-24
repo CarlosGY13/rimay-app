@@ -14,16 +14,10 @@ type Props = {
   onClose: () => void;
 };
 
-// ⚠️ TEMPORAL (Tarea 6): token de operador compartido enviado con cada acción
-// sensible. Va inyectado en el bundle (NEXT_PUBLIC_*), así que es un candado
-// simple, no un login. Se reemplaza por sesiones reales en la Tarea 7.
-const OPERATOR_TOKEN = process.env.NEXT_PUBLIC_OPERATOR_TOKEN ?? "";
-
+// Las rutas de operador se autorizan con la sesión (cookie httpOnly), que el
+// navegador envía automáticamente en las requests same-origin (Tarea 7).
 function operatorHeaders(): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-    "x-operator-token": OPERATOR_TOKEN,
-  };
+  return { "Content-Type": "application/json" };
 }
 
 export function HandoffPanel({ sessionId, onClose }: Props) {
