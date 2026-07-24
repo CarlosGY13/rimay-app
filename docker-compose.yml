@@ -35,8 +35,13 @@ services:
       HOSTNAME: 0.0.0.0
       # Dentro de la red de Docker el host de la DB es el nombre del servicio
       # ("postgres"), no localhost. Se arma desde los componentes del .env.
-      # La app todavía NO consume esta variable (eso es la Tarea 3).
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Proveedor de IA (Tarea 4). Se leen del .env del host.
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     ports:
       - "${APP_PORT:-3000}:3000"
     depends_on:

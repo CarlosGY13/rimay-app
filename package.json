@@ -16,8 +16,10 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@google/genai": "^1.0.0",
     "@prisma/client": "^6.19.3",
     "next": "14.2.18",
+    "openai": "^6.49.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
