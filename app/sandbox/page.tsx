@@ -14,6 +14,10 @@ import {
   AlertIcon,
 } from "@/app/components/icons";
 
+// Duración consistente para el feedback de "escribiendo…" del agente,
+// alineada con el tono breve del toast de guardado del portal.
+const FEEDBACK_DELAY_MS = 900;
+
 function mensajeInicial(nombre: string): ChatMessage {
   const negocio = nombre.trim().length > 0 ? nombre.trim() : "nuestro negocio";
   return {
@@ -66,7 +70,6 @@ function SandboxContent() {
         msgNorm.includes("ok") ||
         msgNorm.includes("confirmar"));
 
-    const delay = 800 + Math.random() * 400;
     setTimeout(() => {
       if (esConfirmacion && pendingOrder) {
         // Confirm the order
@@ -120,7 +123,7 @@ function SandboxContent() {
         }
       }
       setEscribiendo(false);
-    }, delay);
+    }, FEEDBACK_DELAY_MS);
   }
 
   function reiniciar() {

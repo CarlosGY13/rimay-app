@@ -58,6 +58,10 @@ type BusinessContextValue = {
 
 const BusinessContext = createContext<BusinessContextValue | null>(null);
 
+// Duración del toast "Configuración guardada" del portal. Se mantiene como
+// constante para dar un tiempo de lectura consistente al feedback de la UI.
+const TOAST_DURATION_MS = 2500;
+
 function generarId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -146,7 +150,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const save = useCallback(() => {
     // MOCK: no hay persistencia real. Solo confirmamos visualmente.
     setGuardado(true);
-    setTimeout(() => setGuardado(false), 3000);
+    setTimeout(() => setGuardado(false), TOAST_DURATION_MS);
   }, []);
 
   const value = useMemo<BusinessContextValue>(

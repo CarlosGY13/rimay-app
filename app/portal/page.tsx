@@ -230,29 +230,35 @@ function PortalContent() {
           title="Reglas del negocio"
           description="Escríbelas como se las explicarías a un nuevo empleado."
         >
-          <div className="space-y-2">
-            {config.reglas.map((regla, index) => (
-              <div
-                key={index}
-                className="flex items-start gap-2 rounded-xl border border-ink-200 bg-ink-50/50 p-3 transition-colors focus-within:border-brand-300 focus-within:bg-white"
-              >
-                <Textarea
-                  value={regla}
-                  onChange={(e) => updateRegla(index, e.target.value)}
-                  rows={2}
-                  className="flex-1 border-0 bg-transparent p-0 shadow-none focus:ring-0"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeRegla(index)}
-                  className="shrink-0 rounded-lg p-2 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                  aria-label="Eliminar regla"
+          {config.reglas.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-ink-200 py-10 text-center text-sm text-ink-400">
+              Aún no hay reglas. Agrega la primera abajo.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {config.reglas.map((regla, index) => (
+                <div
+                  key={index}
+                  className="flex items-start gap-2 rounded-xl border border-ink-200 bg-ink-50/50 p-3 transition-colors focus-within:border-brand-300 focus-within:bg-white"
                 >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-          </div>
+                  <Textarea
+                    value={regla}
+                    onChange={(e) => updateRegla(index, e.target.value)}
+                    rows={2}
+                    className="flex-1 border-0 bg-transparent p-0 shadow-none focus:ring-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeRegla(index)}
+                    className="shrink-0 rounded-lg p-2 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                    aria-label="Eliminar regla"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="mt-3 flex gap-2">
             <Input
