@@ -18,9 +18,15 @@ RUN npm ci
 # ---- Stage 2: builder (compila la app) ----
 FROM node:18-alpine AS builder
 WORKDIR /app
+# openssl es necesario para los motores de Prisma en Alpine.
+RUN apk add --no-cache openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Genera el Prisma Client para que el type-check de `next build` encuentre
+# los tipos de @prisma/client (lo importa lib/db.ts). La app todavía no lo usa
+# en runtime; eso llega en la Tarea 3.
+RUN npx prisma generate
 RUN npm run build
 
 # ---- Stage 3: runner (imagen final de producción) ----

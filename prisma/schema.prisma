@@ -1,0 +1,160 @@
+// ============================================================
+// Rimay - modelo de datos multi-tenant
+//
+// Estrategia: UNA sola base de datos con `tenant_id` en cada tabla
+// de datos de negocio (no una DB ni un schema por cliente). Esto
+// escala mejor operativamente y es la base sobre la que la Tarea 3
+// migrará BusinessContext y conversationStore.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------
+
+enum Rubro {
+  restaurante
+  tienda_ropa
+  veterinaria_belleza
+  generico
+}
+
+enum Tono {
+  cercano
+  formal
+  juvenil
+}
+
+enum Channel {
+  web
+  whatsapp
+  instagram
+  facebook
+}
+
+enum ConversationStatus {
+  nuevo
+  en_preparacion
+  requiere_revision
+  completado
+}
+
+enum Sender {
+  cliente
+  agente
+  operador
+}
+
+// ------------------------------------------------------------
+// Tenant: cada negocio/cliente de Rimay
+// ------------------------------------------------------------
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  // slug único para URLs tipo /t/sabores-del-valle
+  slug      String   @unique
+  rubro     Rubro
+  tono      Tono     @default(cercano)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  catalogItems  CatalogItem[]
+  businessRules BusinessRule[]
+  conversations Conversation[]
+
+  @@map("tenants")
+}
+
+// ------------------------------------------------------------
+// CatalogItem: ítem del catálogo de un tenant
+//
+// Los campos comunes (name, price, description) son columnas.
+// Los campos específicos por rubro (categoria, tallas, color,
+// duracion) se guardan en `attributes` (JSON) porque varían
+// demasiado entre rubros para justificar columnas dedicadas y
+// nullables por todos lados. La Tarea 3 mapeará el mock a esto.
+// ------------------------------------------------------------
+
+model CatalogItem {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  price       Decimal  @db.Decimal(10, 2)
+  description String?
+  attributes  Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("catalog_items")
+}
+
+// ------------------------------------------------------------
+// BusinessRule: regla de negocio en lenguaje natural
+// ------------------------------------------------------------
+
+model BusinessRule {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("business_rules")
+}
+
+// ------------------------------------------------------------
+// Conversation: hilo entrante de un canal (resumen operativo)
+// ------------------------------------------------------------
+
+model Conversation {
+  id           String             @id @default(uuid())
+  tenantId     String             @map("tenant_id")
+  customerName String             @map("customer_name")
+  channel      Channel
+  status       ConversationStatus @default(nuevo)
+  summary      String?
+  totalAmount  Decimal?           @map("total_amount") @db.Decimal(10, 2)
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([tenantId])
+  @@map("conversations")
+}
+
+// ------------------------------------------------------------
+// Message: detalle de mensajes de una conversación
+//
+// Separa el detalle del resumen de la conversación. Lo vamos a
+// necesitar al conectar el motor de IA real más adelante.
+// ------------------------------------------------------------
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  sender         Sender
+  content        String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("messages")
+}

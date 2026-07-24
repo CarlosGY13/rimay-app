@@ -33,9 +33,10 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-      # Definida ya para que la Tarea 2 (persistencia) la consuma directamente.
-      # Todavía NO se usa desde el código.
-      DATABASE_URL: ${DATABASE_URL}
+      # Dentro de la red de Docker el host de la DB es el nombre del servicio
+      # ("postgres"), no localhost. Se arma desde los componentes del .env.
+      # La app todavía NO consume esta variable (eso es la Tarea 3).
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     ports:
       - "${APP_PORT:-3000}:3000"
     depends_on:

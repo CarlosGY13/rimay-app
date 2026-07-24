@@ -60,3 +60,26 @@ La app se puede levantar dentro de Docker junto a una instancia de Postgres, amb
 Los datos de Postgres persisten en un volumen nombrado (`postgres_data`): si haces `docker compose down` y luego `docker compose up` de nuevo, la base se conserva. Solo `docker compose down -v` borra el volumen.
 
 > **Nota:** en esta etapa Postgres queda levantado, saludable y disponible en `localhost:5432`, pero **la app todavía no lo usa**. La migración de la persistencia real (config del negocio y conversaciones) a Postgres es la siguiente tarea del roadmap. La variable `DATABASE_URL` ya queda definida en `.env` para que esa tarea la consuma directamente.
+
+## Base de datos (Prisma + Postgres)
+
+El modelo de datos multi-tenant vive en `prisma/schema.prisma` (una sola base de datos con `tenant_id` en cada tabla de negocio). El cliente reutilizable está en `lib/db.ts`.
+
+> En esta etapa el esquema, las migraciones y el cliente quedan listos, pero **la app todavía no los usa**: `BusinessContext` y `conversationStore` siguen en memoria. La conexión real es la siguiente tarea del roadmap.
+
+### Correr migraciones y seed contra el Postgres de Docker
+
+La forma reproducible (y equivalente a lo que hará CI/CD) es correr Prisma **dentro de la red de Docker**, usando el host `postgres` del `docker-compose`. Con el contenedor de Postgres arriba (`docker compose up -d postgres`):
+
+```bash
+docker run --rm --network rimay-app_rimay \
+  -v "$PWD:/app" -w /app \
+  -e DATABASE_URL="postgresql://rimay:rimay_local_password@postgres:5432/rimay" \
+  node:18-slim sh -lc "npx prisma migrate deploy && npx prisma db seed"
+```
+
+Los scripts equivalentes en `package.json` (`npm run db:migrate`, `db:seed`, `db:generate`) leen `DATABASE_URL` del entorno, pensados para el pipeline y AWS.
+
+> **Nota de red local:** si corrés Prisma directamente desde el host (`npm run db:migrate`) y tu WSL/Docker no expone el contenedor en `localhost` (por ejemplo si ya tenés otro Postgres ocupando el 5432), usá el comando de arriba dentro de la red de Docker, que no depende de la red del host.
+
+El seed crea un tenant de ejemplo (**Sabores del Valle**, rubro restaurante) con 4 ítems de catálogo y 2 reglas, replicando los datos mock del rubro restaurante.
