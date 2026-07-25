@@ -3,8 +3,9 @@ import { getProvider } from "./getProvider";
 import { safeFallback } from "./schema";
 
 // Timeout máximo para la llamada al proveedor de IA. Si se vence, caemos al
-// fallback seguro para no dejar el chat colgado.
-const TIMEOUT_MS = 10_000;
+// fallback seguro para no dejar el chat colgado. Un poco holgado para que las
+// respuestas con historial no caigan al fallback por lentitud ocasional.
+const TIMEOUT_MS = 20_000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
