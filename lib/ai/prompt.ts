@@ -5,16 +5,18 @@ import type { AIBusinessContext, AICatalogItem } from "./provider";
 export function buildMenuExtractionPrompt(rubro: string): string {
   return [
     `Esta es la imagen de una carta/menú de un negocio del rubro ${rubro}.`,
-    "Extraé ÚNICAMENTE los ítems que aparecen escritos en la imagen, con su nombre y su precio exacto tal como figuran.",
+    "Extraé TODOS los ítems que aparecen escritos en la imagen, con su nombre y su precio exacto tal como figuran.",
+    "",
+    "Sé exhaustivo: recorré la imagen completa de arriba a abajo y de izquierda a derecha, incluí todas las secciones y columnas. No omitas ningún plato que tenga nombre y precio visibles.",
     "",
     "Reglas estrictas:",
-    "- NO inventes ítems ni precios. Si algo no está en la imagen, no lo incluyas.",
+    "- NO inventes ítems ni precios. Incluí solo lo que realmente está en la imagen.",
     "- Si no podés leer el precio de un ítem con certeza, omití ese ítem.",
-    "- El precio debe ser un número (sin símbolo de moneda).",
+    "- El precio debe ser un número (sin símbolo de moneda ni separador de miles).",
     "- Para 'categoria' usá 'entrada', 'fondo' o 'bebida' si corresponde; si no estás seguro, usá null.",
-    "- No repitas el mismo ítem dos veces.",
+    "- Listá cada ítem UNA sola vez, aunque aparezca repetido en la imagen.",
     "",
-    "Devolvé la lista en el formato estructurado indicado (items[]).",
+    "Devolvé la lista completa en el formato estructurado indicado (items[]).",
   ].join("\n");
 }
 

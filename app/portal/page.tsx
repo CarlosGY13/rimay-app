@@ -83,9 +83,13 @@ function PortalContent() {
 
   function guardarItem(datos: Omit<CatalogItem, "id">) {
     if (itemEditando) {
-      updateItem(itemEditando.id, datos);
+      // Al editar, preservamos el origen del ítem (IA o manual).
+      updateItem(itemEditando.id, {
+        ...datos,
+        origen: itemEditando.origen ?? "manual",
+      });
     } else {
-      addItem(datos);
+      addItem({ ...datos, origen: "manual" });
     }
     cerrarModal();
   }
@@ -198,6 +202,21 @@ function PortalContent() {
                         {item.nombre}
                       </span>
                       <Badge tone="neutral">S/ {item.precio.toFixed(2)}</Badge>
+                      <span
+                        className={[
+                          "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                          item.origen === "ai"
+                            ? "bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-100"
+                            : "bg-ink-100 text-ink-500",
+                        ].join(" ")}
+                        title={
+                          item.origen === "ai"
+                            ? "Extraído de una carta con IA"
+                            : "Agregado a mano"
+                        }
+                      >
+                        {item.origen === "ai" ? "IA" : "Manual"}
+                      </span>
                     </div>
                     {atributosItem(item) && (
                       <div className="mt-1 text-xs text-ink-400">

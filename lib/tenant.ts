@@ -185,6 +185,7 @@ type CatalogAttributes = {
   tallas?: string[];
   color?: string;
   duracion?: string;
+  origen?: AppCatalogItem["origen"];
 };
 
 export function dbCatalogItemToApp(item: CatalogItem): AppCatalogItem {
@@ -198,6 +199,7 @@ export function dbCatalogItemToApp(item: CatalogItem): AppCatalogItem {
     tallas: attrs.tallas,
     color: attrs.color,
     duracion: attrs.duracion,
+    origen: attrs.origen,
   };
 }
 
@@ -211,6 +213,7 @@ export function appCatalogAttributes(
   if (data.tallas && data.tallas.length > 0) attrs.tallas = data.tallas;
   if (data.color) attrs.color = data.color;
   if (data.duracion) attrs.duracion = data.duracion;
+  if (data.origen) attrs.origen = data.origen;
   return attrs as Prisma.InputJsonValue;
 }
 

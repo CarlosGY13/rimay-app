@@ -16,6 +16,10 @@ export type CategoriaPlato = "entrada" | "fondo" | "bebida";
 
 // Ítem unificado del catálogo. Los campos opcionales aplican
 // según el rubro elegido en el onboarding.
+
+// Cómo se cargó el ítem: extraído por la IA desde una carta, o a mano.
+export type ItemOrigen = "ai" | "manual";
+
 export type CatalogItem = {
   id: string;
   nombre: string;
@@ -29,6 +33,8 @@ export type CatalogItem = {
   duracion?: string;
   // genérico
   descripcion?: string;
+  // origen de la carga (IA vs manual)
+  origen?: ItemOrigen;
 };
 
 export type Canales = {
