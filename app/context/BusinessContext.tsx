@@ -30,6 +30,15 @@ const CONFIG_VACIA: BusinessConfig = {
   cartaFileName: null,
 };
 
+// Genera un id temporal ÚNICO para updates optimistas. Un contador evita
+// colisiones cuando se agregan varios ítems en el mismo milisegundo (p. ej. al
+// aplicar una carta), lo que antes producía duplicados visuales.
+let tempSeq = 0;
+function nuevoTempId(): string {
+  tempSeq += 1;
+  return `temp-${Date.now()}-${tempSeq}`;
+}
+
 // Forma de la regla tal como la devuelve la API (texto + id de la fila).
 type ReglaApi = { id: string; text: string };
 type BusinessApi = {
@@ -198,7 +207,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   // ---- Catálogo ----
   const addItem = useCallback(
     (item: Omit<CatalogItem, "id">) => {
-      const tempId = `temp-${Date.now()}`;
+      const tempId = nuevoTempId();
       setConfig((prev) => ({
         ...prev,
         catalogo: [...prev.catalogo, { ...item, id: tempId }],
@@ -279,7 +288,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   // ---- Reglas ----
   const addRegla = useCallback(
     (texto: string) => {
-      const tempId = `temp-${Date.now()}`;
+      const tempId = nuevoTempId();
       setConfig((prev) => ({ ...prev, reglas: [...prev.reglas, texto] }));
       setRuleIds((prev) => [...prev, tempId]);
 
