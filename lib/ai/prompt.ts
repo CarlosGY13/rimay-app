@@ -1,5 +1,23 @@
 import type { AIBusinessContext, AICatalogItem } from "./provider";
 
+// Prompt para extraer ítems de una imagen de carta/menú. Es estricto: el
+// modelo solo debe transcribir lo que ve, nunca inventar ítems ni precios.
+export function buildMenuExtractionPrompt(rubro: string): string {
+  return [
+    `Esta es la imagen de una carta/menú de un negocio del rubro ${rubro}.`,
+    "Extraé ÚNICAMENTE los ítems que aparecen escritos en la imagen, con su nombre y su precio exacto tal como figuran.",
+    "",
+    "Reglas estrictas:",
+    "- NO inventes ítems ni precios. Si algo no está en la imagen, no lo incluyas.",
+    "- Si no podés leer el precio de un ítem con certeza, omití ese ítem.",
+    "- El precio debe ser un número (sin símbolo de moneda).",
+    "- Para 'categoria' usá 'entrada', 'fondo' o 'bebida' si corresponde; si no estás seguro, usá null.",
+    "- No repitas el mismo ítem dos veces.",
+    "",
+    "Devolvé la lista en el formato estructurado indicado (items[]).",
+  ].join("\n");
+}
+
 const TONO_INSTRUCCION: Record<string, string> = {
   cercano: "Cercano y cálido, como alguien de confianza.",
   formal: "Formal y directo, tratando de usted.",

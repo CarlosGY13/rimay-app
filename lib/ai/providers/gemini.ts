@@ -1,7 +1,33 @@
 import { GoogleGenAI, Type, type Content } from "@google/genai";
-import type { AIProvider, AIRequest, AIResponse } from "../provider";
-import { buildSystemPrompt } from "../prompt";
-import { parseStructuredResponse } from "../schema";
+import type {
+  AIProvider,
+  AIRequest,
+  AIResponse,
+  MenuExtractionRequest,
+  ExtractedCatalogItem,
+} from "../provider";
+import { buildSystemPrompt, buildMenuExtractionPrompt } from "../prompt";
+import { parseStructuredResponse, parseExtractedItems } from "../schema";
+
+// Schema de salida para la extracción de carta (Gemini).
+const GEMINI_MENU_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    items: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          nombre: { type: Type.STRING },
+          precio: { type: Type.NUMBER },
+          categoria: { type: Type.STRING, nullable: true },
+        },
+        required: ["nombre", "precio", "categoria"],
+      },
+    },
+  },
+  required: ["items"],
+};
 
 // Schema de salida para Gemini (responseSchema). Equivalente al de OpenAI.
 const GEMINI_RESPONSE_SCHEMA = {
@@ -61,5 +87,36 @@ export class GeminiProvider implements AIProvider {
       needsHumanReview: parsed.needsHumanReview,
       reviewReason: parsed.reviewReason,
     };
+  }
+
+  async extractCatalogItems(
+    input: MenuExtractionRequest
+  ): Promise<ExtractedCatalogItem[]> {
+    const prompt = buildMenuExtractionPrompt(input.rubro);
+
+    const response = await this.ai.models.generateContent({
+      model: this.model,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: input.mimeType,
+                data: input.imageBase64,
+              },
+            },
+          ],
+        },
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: GEMINI_MENU_SCHEMA,
+      },
+    });
+
+    const raw = response.text ?? "";
+    return parseExtractedItems(raw);
   }
 }

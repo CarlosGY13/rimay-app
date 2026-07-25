@@ -59,6 +59,26 @@ export type AIResponse = {
   reviewReason: string | null;
 };
 
+// ---- Extracción de catálogo desde una imagen de carta/menú ----
+
+export type ExtractedCatalogItem = {
+  nombre: string;
+  precio: number;
+  categoria?: string | null;
+};
+
+export type MenuExtractionRequest = {
+  // Imagen de la carta en base64 (sin el prefijo data:).
+  imageBase64: string;
+  mimeType: string;
+  rubro: string;
+};
+
 export interface AIProvider {
   generateResponse(input: AIRequest): Promise<AIResponse>;
+  // Analiza una imagen de carta/menú y extrae los ítems que aparecen en ella.
+  // NO debe inventar ítems ni precios: solo lo que esté en la imagen.
+  extractCatalogItems(
+    input: MenuExtractionRequest
+  ): Promise<ExtractedCatalogItem[]>;
 }

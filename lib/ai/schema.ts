@@ -1,4 +1,4 @@
-import type { AIResponse } from "./provider";
+import type { AIResponse, ExtractedCatalogItem } from "./provider";
 
 // ============================================================
 // Salida estructurada del motor de IA
@@ -46,6 +46,52 @@ export function safeFallback(reason: string): AIResponse {
     needsHumanReview: true,
     reviewReason: reason,
   };
+}
+
+// ---- Extracción de catálogo desde imagen ----
+
+// JSON Schema para OpenAI (strict): un objeto con un array `items`.
+export const OPENAI_MENU_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          nombre: { type: "string" },
+          precio: { type: "number" },
+          categoria: { type: ["string", "null"] },
+        },
+        required: ["nombre", "precio", "categoria"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["items"],
+  additionalProperties: false,
+};
+
+// Parsea y valida la lista de ítems extraídos. Descarta entradas inválidas
+// (sin nombre o sin precio numérico) en vez de fallar toda la extracción.
+export function parseExtractedItems(raw: string): ExtractedCatalogItem[] {
+  const obj = JSON.parse(raw) as { items?: unknown };
+  if (!Array.isArray(obj.items)) return [];
+
+  const result: ExtractedCatalogItem[] = [];
+  for (const it of obj.items) {
+    if (!it || typeof it !== "object") continue;
+    const item = it as Record<string, unknown>;
+    const nombre = typeof item.nombre === "string" ? item.nombre.trim() : "";
+    const precio = typeof item.precio === "number" ? item.precio : NaN;
+    if (nombre.length === 0 || !Number.isFinite(precio) || precio <= 0) continue;
+    const categoria =
+      typeof item.categoria === "string" && item.categoria.trim().length > 0
+        ? item.categoria.trim().toLowerCase()
+        : null;
+    result.push({ nombre, precio, categoria });
+  }
+  return result;
 }
 
 // Parsea y valida la salida cruda del modelo contra el schema esperado.

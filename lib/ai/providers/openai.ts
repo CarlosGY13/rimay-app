@@ -1,7 +1,18 @@
 import OpenAI from "openai";
-import type { AIProvider, AIRequest, AIResponse } from "../provider";
-import { buildSystemPrompt } from "../prompt";
-import { OPENAI_RESPONSE_SCHEMA, parseStructuredResponse } from "../schema";
+import type {
+  AIProvider,
+  AIRequest,
+  AIResponse,
+  MenuExtractionRequest,
+  ExtractedCatalogItem,
+} from "../provider";
+import { buildSystemPrompt, buildMenuExtractionPrompt } from "../prompt";
+import {
+  OPENAI_RESPONSE_SCHEMA,
+  OPENAI_MENU_SCHEMA,
+  parseStructuredResponse,
+  parseExtractedItems,
+} from "../schema";
 
 // Adaptador de OpenAI. Lee la API key de OPENAI_API_KEY (nunca hardcodeada) y
 // usa structured outputs (json_schema) para forzar la forma de la respuesta.
@@ -54,5 +65,36 @@ export class OpenAIProvider implements AIProvider {
       needsHumanReview: parsed.needsHumanReview,
       reviewReason: parsed.reviewReason,
     };
+  }
+
+  async extractCatalogItems(
+    input: MenuExtractionRequest
+  ): Promise<ExtractedCatalogItem[]> {
+    const prompt = buildMenuExtractionPrompt(input.rubro);
+    const dataUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
+
+    const completion = await this.client.chat.completions.create({
+      model: this.model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "rimay_menu_items",
+          strict: true,
+          schema: OPENAI_MENU_SCHEMA,
+        },
+      },
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "";
+    return parseExtractedItems(raw);
   }
 }
