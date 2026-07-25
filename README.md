@@ -106,3 +106,25 @@ Se eligió **JWT firmado con `jose` guardado en una cookie httpOnly**, en vez de
 La sesión guarda `userId` y `tenantId`; cada ruta API lee el `tenantId` de la sesión (ya no hay "tenant fijo" hardcodeado). Las contraseñas se hashean con `bcryptjs`.
 
 > El secreto de firma se configura en `SESSION_SECRET` (ver `.env.example`). En el piloto local la cookie va sin `secure` porque corre sobre `http://localhost`; detrás de HTTPS debe activarse `secure`.
+
+## Dos modos de correr la app
+
+Hay dos formas de levantarla, según lo que necesites:
+
+### Desarrollo con recarga en caliente (día a día)
+
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+
+Corre `next dev` con el código montado como volumen: **guardás un archivo y se refleja al instante**, sin rebuildear. Ideal para iterar. (La primera vez instala dependencias dentro del contenedor y tarda un poco; después arranca rápido.)
+
+### Producción / prueba del build final
+
+```bash
+docker compose up --build
+```
+
+Construye la imagen optimizada (igual que en el servidor). Usalo para verificar que el build de producción funciona antes de desplegar, no para el día a día.
+
+> No corras los dos modos a la vez: ambos usan los puertos 3000 y 5432. Para cambiar de uno a otro: `docker compose down` (o `docker compose -f docker-compose.dev.yml down`) y luego levantá el otro. Ambos comparten el mismo volumen de datos de Postgres.

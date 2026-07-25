@@ -1,0 +1,70 @@
+# Stack de DESARROLLO con recarga en caliente (hot reload).
+#
+# Uso:
+#   docker compose -f docker-compose.dev.yml up
+#
+# Corre `next dev` dentro de un contenedor con el código montado como volumen,
+# así los cambios se reflejan al instante sin rebuildear. Comparte el mismo
+# volumen de datos (postgres_data) que el stack de producción.
+#
+# NO lo corras al mismo tiempo que `docker compose up` (ambos usan el 3000/5432).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - rimay
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  app:
+    image: node:18-bookworm-slim
+    working_dir: /app
+    # Instala deps (en el volumen del contenedor), aplica migraciones pendientes
+    # y arranca Next en modo dev escuchando en todas las interfaces.
+    command: sh -lc "npm install && npx prisma migrate deploy && npx next dev -H 0.0.0.0 -p 3000"
+    environment:
+      NODE_ENV: development
+      # Dentro de la red de Docker la DB es el servicio "postgres".
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      # Necesario para que el file-watching funcione sobre el bind mount.
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      # Código fuente montado: los cambios se reflejan en caliente.
+      - .:/app
+      # node_modules y .next viven en el contenedor (no se mezclan con el host).
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rimay
+
+volumes:
+  postgres_data:
+
+networks:
+  rimay:
+    driver: bridge
