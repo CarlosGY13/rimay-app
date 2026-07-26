@@ -36,6 +36,25 @@ const GEMINI_RESPONSE_SCHEMA = {
     reply: { type: Type.STRING },
     needsHumanReview: { type: Type.BOOLEAN },
     reviewReason: { type: Type.STRING, nullable: true },
+    order: {
+      type: Type.OBJECT,
+      nullable: true,
+      properties: {
+        items: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              nombre: { type: Type.STRING },
+              precio: { type: Type.NUMBER },
+            },
+            required: ["nombre", "precio"],
+          },
+        },
+        total: { type: Type.NUMBER },
+      },
+      required: ["items", "total"],
+    },
   },
   required: ["reply", "needsHumanReview", "reviewReason"],
 };
@@ -86,6 +105,7 @@ export class GeminiProvider implements AIProvider {
       text: parsed.reply,
       needsHumanReview: parsed.needsHumanReview,
       reviewReason: parsed.reviewReason,
+      order: parsed.order,
     };
   }
 

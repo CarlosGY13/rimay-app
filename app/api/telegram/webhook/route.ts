@@ -12,6 +12,7 @@ import {
   getSession,
   addMessage,
   markNeedsReview,
+  updateOrderInfo,
 } from "@/lib/conversationStore";
 import { generarRespuestaIA } from "@/lib/ai/engine";
 import type { AIBusinessContext, AIMessage } from "@/lib/ai/provider";
@@ -108,6 +109,14 @@ export async function POST(request: Request) {
     const res = await generarRespuestaIA({ message: text, history, business });
 
     await addMessage(conv.id, "agent", res.text);
+
+    // Si el cliente confirmó un pedido, guardamos items + total (se ve en el inbox).
+    if (res.order) {
+      const resumenPedido = res.order.items
+        .map((i) => `${i.nombre} (S/ ${i.precio.toFixed(2)})`)
+        .join(", ");
+      await updateOrderInfo(conv.id, resumenPedido, res.order.total);
+    }
     if (res.needsHumanReview) {
       await markNeedsReview(conv.id, res.reviewReason ?? undefined);
     }
