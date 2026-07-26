@@ -68,10 +68,12 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  catalogItems  CatalogItem[]
-  businessRules BusinessRule[]
-  conversations Conversation[]
-  user          User?
+  catalogItems       CatalogItem[]
+  businessRules      BusinessRule[]
+  conversations      Conversation[]
+  insights           ConversationInsight[]
+  insightAggregation InsightAggregation?
+  user               User?
 
   @@map("tenants")
 }
@@ -158,6 +160,7 @@ model Conversation {
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   messages Message[]
+  insight  ConversationInsight?
 
   @@index([tenantId])
   @@index([tenantId, channel, externalId])
@@ -182,4 +185,43 @@ model Message {
 
   @@index([conversationId])
   @@map("messages")
+}
+
+// ------------------------------------------------------------
+// ConversationInsight: insight de fricción extraído por IA al
+// cerrar una conversación. Uno por conversación (unique).
+// ------------------------------------------------------------
+
+model ConversationInsight {
+  id             String   @id @default(uuid())
+  conversationId String   @unique @map("conversation_id")
+  tenantId       String   @map("tenant_id")
+  summary        String
+  tags           Json     // string[]
+  hadFriction    Boolean  @default(false) @map("had_friction")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("conversation_insights")
+}
+
+// ------------------------------------------------------------
+// InsightAggregation: resumen agregado de insights por tenant.
+// Un solo registro por tenant, se sobreescribe en cada análisis.
+// ------------------------------------------------------------
+
+model InsightAggregation {
+  id            String   @id @default(uuid())
+  tenantId      String   @unique @map("tenant_id")
+  themes        Json     // AggregationTheme[]
+  analyzedCount Int      @default(0) @map("analyzed_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("insight_aggregations")
 }
