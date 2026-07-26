@@ -86,6 +86,9 @@ export function buildSystemPrompt(business: AIBusinessContext): string {
     "== REGLAS DEL NEGOCIO ==",
     reglas,
     "",
-    "Devuelve tu respuesta en el formato estructurado indicado (reply, needsHumanReview, reviewReason). reviewReason debe ser null salvo que needsHumanReview sea true.",
+    "== PEDIDO ==",
+    "Cuando el cliente CONFIRMA un pedido concreto (dice que sí, que lo quiere, etc.), devolvé 'order' con la lista de items (usando el nombre y el precio EXACTOS del catálogo) y el 'total' sumado. Si todavía no hay un pedido confirmado, order = null. Nunca inventes precios para el total.",
+    "",
+    "Devuelve tu respuesta en el formato estructurado indicado (reply, needsHumanReview, reviewReason, order). reviewReason debe ser null salvo que needsHumanReview sea true; order debe ser null salvo que el cliente haya confirmado un pedido.",
   ].join("\n");
 }

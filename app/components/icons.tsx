@@ -157,6 +157,15 @@ export function SparklesIcon(props: IconProps) {
   );
 }
 
+export function TelegramIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M21.5 4.5 2.5 12.5l6 2 2.5 6 3-4 5 3.5z" />
+      <path d="m8.5 14.5 9-7" />
+    </Icon>
+  );
+}
+
 export function LogoutIcon(props: IconProps) {
   return (
     <Icon {...props}>

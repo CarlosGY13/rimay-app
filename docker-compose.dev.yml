@@ -51,6 +51,9 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       SESSION_SECRET: ${SESSION_SECRET:-}
+      # Telegram (integración por webhook).
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       # Necesario para que el file-watching funcione sobre el bind mount.
       WATCHPACK_POLLING: "true"
     ports:

@@ -44,6 +44,9 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       # Secreto para firmar/verificar los JWT de sesión (Tarea 7).
       SESSION_SECRET: ${SESSION_SECRET:-}
+      # Telegram (integración por webhook).
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
     ports:
       - "${APP_PORT:-3000}:3000"
     depends_on:

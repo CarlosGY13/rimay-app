@@ -64,6 +64,7 @@ export class OpenAIProvider implements AIProvider {
       text: parsed.reply,
       needsHumanReview: parsed.needsHumanReview,
       reviewReason: parsed.reviewReason,
+      order: parsed.order,
     };
   }
 

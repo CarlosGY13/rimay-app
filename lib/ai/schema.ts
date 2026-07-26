@@ -1,4 +1,4 @@
-import type { AIResponse, ExtractedCatalogItem } from "./provider";
+import type { AIResponse, ExtractedCatalogItem, AIOrder } from "./provider";
 
 // ============================================================
 // Salida estructurada del motor de IA
@@ -13,6 +13,7 @@ export type StructuredResponse = {
   reply: string;
   needsHumanReview: boolean;
   reviewReason: string | null;
+  order: AIOrder | null;
 };
 
 // JSON Schema para OpenAI (structured outputs, modo strict: todas las
@@ -33,8 +34,30 @@ export const OPENAI_RESPONSE_SCHEMA = {
       description:
         "Motivo de la escalada, solo si needsHumanReview es true; null en caso contrario.",
     },
+    order: {
+      type: ["object", "null"],
+      description:
+        "Pedido confirmado por el cliente; null si todavía no cerró un pedido.",
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              nombre: { type: "string" },
+              precio: { type: "number" },
+            },
+            required: ["nombre", "precio"],
+            additionalProperties: false,
+          },
+        },
+        total: { type: "number" },
+      },
+      required: ["items", "total"],
+      additionalProperties: false,
+    },
   },
-  required: ["reply", "needsHumanReview", "reviewReason"],
+  required: ["reply", "needsHumanReview", "reviewReason", "order"],
   additionalProperties: false,
 };
 
@@ -45,6 +68,7 @@ export function safeFallback(reason: string): AIResponse {
     text: "Dame un momento, ya te ayudo.",
     needsHumanReview: true,
     reviewReason: reason,
+    order: null,
   };
 }
 
@@ -115,5 +139,33 @@ export function parseStructuredResponse(raw: string): StructuredResponse {
     reply: obj.reply,
     needsHumanReview: obj.needsHumanReview,
     reviewReason,
+    order: parseOrder(obj.order),
   };
+}
+
+// Valida y normaliza el pedido. Devuelve null si falta o no es válido.
+function parseOrder(raw: unknown): AIOrder | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (!Array.isArray(o.items)) return null;
+
+  const items = o.items
+    .map((it) => {
+      if (!it || typeof it !== "object") return null;
+      const item = it as Record<string, unknown>;
+      const nombre = typeof item.nombre === "string" ? item.nombre.trim() : "";
+      const precio = typeof item.precio === "number" ? item.precio : NaN;
+      if (nombre.length === 0 || !Number.isFinite(precio)) return null;
+      return { nombre, precio };
+    })
+    .filter((x): x is AIOrder["items"][number] => x !== null);
+
+  if (items.length === 0) return null;
+
+  const total =
+    typeof o.total === "number" && Number.isFinite(o.total)
+      ? o.total
+      : items.reduce((s, i) => s + i.precio, 0);
+
+  return { items, total };
 }

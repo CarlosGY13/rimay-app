@@ -20,12 +20,15 @@ import {
   WhatsappIcon,
   InstagramIcon,
   GlobeIcon,
+  TelegramIcon,
+  TrashIcon,
+  CheckIcon,
 } from "@/app/components/icons";
 
-type Filtro = "todos" | "pendientes" | "revision" | "completado";
+type Filtro = "activos" | "pendientes" | "revision" | "completado";
 
 const TABS: { value: Filtro; label: string }[] = [
-  { value: "todos", label: "Todos" },
+  { value: "activos", label: "Activos" },
   { value: "pendientes", label: "Pendientes" },
   { value: "revision", label: "Requiere atención" },
   { value: "completado", label: "Resueltos" },
@@ -50,6 +53,7 @@ const CANAL: Record<
   whatsapp: { label: "WhatsApp", icon: WhatsappIcon },
   instagram: { label: "Instagram", icon: InstagramIcon },
   web: { label: "Web", icon: GlobeIcon },
+  telegram: { label: "Telegram", icon: TelegramIcon },
 };
 
 function tiempoRelativo(min: number): string {
@@ -72,8 +76,9 @@ function InboxContent() {
   const [localOverrides, setLocalOverrides] = useState<
     Record<string, Partial<Conversacion>>
   >({});
-  const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [filtro, setFiltro] = useState<Filtro>("activos");
   const [webConvs, setWebConvs] = useState<Conversacion[]>([]);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [panelSessionId, setPanelSessionId] = useState<string | null>(null);
 
   // Poll /api/conversations every 3s for widget messages
@@ -102,14 +107,19 @@ function InboxContent() {
     );
     const contextIds = new Set(contextWithOverrides.map((c) => c.id));
     const uniqueWeb = webConvs.filter((c) => !contextIds.has(c.id));
-    return [...contextWithOverrides, ...uniqueWeb];
-  }, [contextConvs, localOverrides, webConvs]);
+    return [...contextWithOverrides, ...uniqueWeb].filter(
+      (c) => !removedIds.has(c.id)
+    );
+  }, [contextConvs, localOverrides, webConvs, removedIds]);
 
   const metrics = useInboxMetrics(conversaciones);
 
   const visibles = useMemo(() => {
     let lista: Conversacion[];
     switch (filtro) {
+      case "activos":
+        lista = conversaciones.filter((c) => c.estado !== "completado");
+        break;
       case "pendientes":
         lista = conversaciones.filter(
           (c) => c.estado === "nuevo" || c.estado === "preparacion"
@@ -152,37 +162,40 @@ function InboxContent() {
   }
 
   async function marcarResuelto(id: string) {
-    // Optimistic update
+    // Optimista: pasa a completado (sale de la vista "Activos").
     setLocalOverrides((prev) => ({
       ...prev,
       [id]: { estado: "completado" },
     }));
     try {
-      const res = await fetch("/api/chat/release", {
-        method: "POST",
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: id }),
+        body: JSON.stringify({ estado: "completado" }),
       });
-      if (!res.ok) {
-        // Revert on failure
-        setLocalOverrides((prev) => {
-          const next = { ...prev };
-          delete next[id];
-          return next;
-        });
-      } else {
-        // Fire-and-forget: extraer insight de la conversación cerrada
-        fetch("/api/insights/extract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ conversationId: id }),
-        }).catch(console.error);
-      }
+      if (!res.ok) throw new Error();
     } catch {
-      // Revert on error
+      // Revertir si falló
       setLocalOverrides((prev) => {
         const next = { ...prev };
         delete next[id];
+        return next;
+      });
+    }
+  }
+
+  async function descartar(id: string) {
+    // Optimista: lo saca del inbox.
+    setRemovedIds((prev) => new Set(prev).add(id));
+    if (panelSessionId === id) setPanelSessionId(null);
+    try {
+      const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+    } catch {
+      // Revertir si falló
+      setRemovedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
         return next;
       });
     }
@@ -286,6 +299,15 @@ function InboxContent() {
                     <p className="mt-1 truncate text-sm text-ink-600">
                       {conv.resumen}
                     </p>
+
+                    {/* Pedido confirmado (cuando el cliente cerró un pedido) */}
+                    {conv.total > 0 && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-100">
+                        <CheckIcon className="h-3.5 w-3.5" />
+                        Pedido confirmado · S/ {conv.total.toFixed(2)}
+                      </div>
+                    )}
+
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 text-xs text-ink-400">
                         <span className="inline-flex items-center gap-1">
@@ -293,35 +315,42 @@ function InboxContent() {
                           {tiempoRelativo(conv.minutosAtras)}
                         </span>
                         <span>{canal.label}</span>
-                        {conv.total > 0 && (
-                          <span className="font-semibold text-ink-700">
-                            S/ {conv.total.toFixed(2)}
-                          </span>
-                        )}
                       </div>
-                      {requiereRevision && (
-                        <Button size="sm" onClick={() => tomarChat(conv.id)}>
-                          Tomar el chat
-                        </Button>
-                      )}
-                      {conv.canal === "web" && !requiereRevision && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setPanelSessionId(conv.id)}
+                      <div className="flex items-center gap-1.5">
+                        {requiereRevision && (
+                          <Button size="sm" onClick={() => tomarChat(conv.id)}>
+                            Tomar el chat
+                          </Button>
+                        )}
+                        {(conv.canal === "web" || conv.canal === "telegram") &&
+                          !requiereRevision && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setPanelSessionId(conv.id)}
+                            >
+                              Ver chat
+                            </Button>
+                          )}
+                        {conv.estado !== "completado" && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => marcarResuelto(conv.id)}
+                          >
+                            Resolver
+                          </Button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => descartar(conv.id)}
+                          className="rounded-lg p-2 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          aria-label="Descartar"
+                          title="Descartar"
                         >
-                          Ver chat
-                        </Button>
-                      )}
-                      {conv.estado !== "completado" && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => marcarResuelto(conv.id)}
-                        >
-                          Marcar como resuelto
-                        </Button>
-                      )}
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

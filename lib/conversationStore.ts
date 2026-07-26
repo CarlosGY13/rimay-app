@@ -92,6 +92,18 @@ export async function conversationTenantId(
   return conv?.tenantId ?? null;
 }
 
+// Devuelve el canal y el id externo (ej. chat_id de Telegram) de una
+// conversación, para saber por dónde entregar la respuesta del operador.
+export async function conversationRouting(
+  sessionId: string
+): Promise<{ channel: DbChannel; externalId: string | null } | null> {
+  const conv = await prisma.conversation.findUnique({
+    where: { id: sessionId },
+    select: { channel: true, externalId: true },
+  });
+  return conv ?? null;
+}
+
 export async function getSession(
   sessionId: string
 ): Promise<WidgetSession | undefined> {
@@ -117,11 +129,54 @@ export async function addMessage(
   });
 }
 
-export async function markNeedsReview(sessionId: string): Promise<void> {
+export async function markNeedsReview(
+  sessionId: string,
+  reason?: string
+): Promise<void> {
   await prisma.conversation.update({
     where: { id: sessionId },
-    data: { status: DbStatus.requiere_revision },
+    data: {
+      status: DbStatus.requiere_revision,
+      // Guarda el motivo en el resumen para que el operador lo vea en el inbox.
+      ...(reason && reason.trim().length > 0 ? { summary: reason.trim() } : {}),
+    },
   });
+}
+
+// Busca (o crea) la conversación asociada a un chat externo (ej. Telegram),
+// correlacionada por tenant + canal + externalId. Devuelve id y si está pausada
+// (operador en control).
+export async function getOrCreateExternalConversation(params: {
+  channel: DbChannel;
+  externalId: string;
+  customerName: string;
+}): Promise<{ id: string; paused: boolean }> {
+  const tenantId = await getFixedTenantId();
+  const existing = await prisma.conversation.findFirst({
+    where: {
+      tenantId,
+      channel: params.channel,
+      externalId: params.externalId,
+    },
+  });
+  if (existing) {
+    return {
+      id: existing.id,
+      paused: existing.status === DbStatus.en_preparacion,
+    };
+  }
+
+  const created = await prisma.conversation.create({
+    data: {
+      tenantId,
+      customerName: params.customerName,
+      channel: params.channel,
+      externalId: params.externalId,
+      status: DbStatus.nuevo,
+      summary: "",
+    },
+  });
+  return { id: created.id, paused: false };
 }
 
 export async function pauseSession(sessionId: string): Promise<void> {

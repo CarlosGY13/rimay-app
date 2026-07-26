@@ -49,6 +49,9 @@ export type AIRequest = {
   business: AIBusinessContext;
 };
 
+export type AIOrderItem = { nombre: string; precio: number };
+export type AIOrder = { items: AIOrderItem[]; total: number };
+
 export type AIResponse = {
   // Texto de respuesta que se le muestra al cliente.
   text: string;
@@ -57,6 +60,9 @@ export type AIResponse = {
   // Motivo de la escalada (solo cuando needsHumanReview es true), para que
   // el operador entienda por qué sin leer todo el historial.
   reviewReason: string | null;
+  // Pedido confirmado por el cliente (items + total del catálogo). null si
+  // todavía no hay un pedido cerrado.
+  order: AIOrder | null;
 };
 
 // ---- Extracción de catálogo desde una imagen de carta/menú ----

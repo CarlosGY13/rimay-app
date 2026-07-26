@@ -58,7 +58,7 @@ export type BusinessConfig = {
 // Inbox (panel operativo mock)
 // ============================================================
 
-export type CanalOrigen = "whatsapp" | "instagram" | "web";
+export type CanalOrigen = "whatsapp" | "instagram" | "web" | "telegram";
 
 export type EstadoConversacion =
   | "nuevo"
