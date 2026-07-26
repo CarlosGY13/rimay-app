@@ -7,6 +7,7 @@ import { Card } from "@/app/components/ui/Card";
 import { useBusiness } from "@/app/context/BusinessContext";
 import type { Rubro } from "@/lib/types";
 import { SparklesIcon, AlertIcon } from "@/app/components/icons";
+import { InsightsSection } from "./InsightsSection";
 
 type MetricaRubro = {
   resueltas: string; // % de conversaciones resueltas sin intervención humana
@@ -92,6 +93,9 @@ function ResumenContent() {
         Datos simulados con fines de demostración. Se actualizarán con métricas
         reales cuando el agente esté conectado a tus canales.
       </p>
+
+      {/* Insights de conversaciones — se llena al cerrar conversaciones */}
+      <InsightsSection />
     </div>
   );
 }

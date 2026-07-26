@@ -170,6 +170,13 @@ function InboxContent() {
           delete next[id];
           return next;
         });
+      } else {
+        // Fire-and-forget: extraer insight de la conversación cerrada
+        fetch("/api/insights/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId: id }),
+        }).catch(console.error);
       }
     } catch {
       // Revert on error
