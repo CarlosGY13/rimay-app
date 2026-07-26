@@ -15,6 +15,24 @@ const KPIS: KpiDef[] = [
     tone: (v) => (v >= 70 ? "brand" : "neutral"),
   },
   {
+    key: "pendientes",
+    label: "Pendientes",
+    format: (v) => `${v}`,
+    tone: (v) => (v > 0 ? "neutral" : "brand"),
+  },
+  {
+    key: "derivadosHumano",
+    label: "Requieren atención",
+    format: (v) => `${v}`,
+    tone: (v) => (v > 0 ? "danger" : "neutral"),
+  },
+  {
+    key: "resueltos",
+    label: "Resueltos",
+    format: (v) => `${v}`,
+    tone: (v) => (v > 0 ? "brand" : "neutral"),
+  },
+  {
     key: "pedidosHoy",
     label: "Pedidos hoy",
     format: (v) => `${v}`,
@@ -26,12 +44,6 @@ const KPIS: KpiDef[] = [
     format: (v) => `S/ ${v.toFixed(2)}`,
     tone: () => "neutral",
   },
-  {
-    key: "derivadosHumano",
-    label: "Derivados a humano",
-    format: (v) => `${v}`,
-    tone: (v) => (v > 0 ? "danger" : "neutral"),
-  },
 ];
 
 const TONE_CLASSES: Record<"neutral" | "brand" | "danger", string> = {
@@ -42,7 +54,7 @@ const TONE_CLASSES: Record<"neutral" | "brand" | "danger", string> = {
 
 export function MetricsPanel({ metrics }: { metrics: InboxMetrics }) {
   return (
-    <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
       {KPIS.map((kpi) => {
         const value = metrics[kpi.key];
         const tone = kpi.tone(value);
