@@ -51,9 +51,42 @@ export const OPENAI_RESPONSE_SCHEMA = {
             additionalProperties: false,
           },
         },
-        total: { type: "number" },
+        tipoEntrega: {
+          type: ["string", "null"],
+          enum: ["recojo", "delivery", null],
+          description: "recojo, delivery, o null si aún no se definió.",
+        },
+        distrito: {
+          type: ["string", "null"],
+          description: "Distrito de entrega (solo si es delivery).",
+        },
+        direccion: {
+          type: ["string", "null"],
+          description: "Dirección de entrega (solo si es delivery).",
+        },
+        envio: {
+          type: ["number", "null"],
+          description:
+            "Costo de envío tomado de la tabla de zonas; 0 si es recojo; null si aún no se define.",
+        },
+        metodoPago: {
+          type: ["string", "null"],
+          description: "Método de pago elegido, entre los aceptados.",
+        },
+        total: {
+          type: "number",
+          description: "Suma de los items más el envío.",
+        },
       },
-      required: ["items", "total"],
+      required: [
+        "items",
+        "tipoEntrega",
+        "distrito",
+        "direccion",
+        "envio",
+        "metodoPago",
+        "total",
+      ],
       additionalProperties: false,
     },
   },
@@ -162,10 +195,31 @@ function parseOrder(raw: unknown): AIOrder | null {
 
   if (items.length === 0) return null;
 
+  const tipoEntrega =
+    o.tipoEntrega === "recojo" || o.tipoEntrega === "delivery"
+      ? o.tipoEntrega
+      : null;
+  const distrito =
+    typeof o.distrito === "string" && o.distrito.trim().length > 0
+      ? o.distrito.trim()
+      : null;
+  const direccion =
+    typeof o.direccion === "string" && o.direccion.trim().length > 0
+      ? o.direccion.trim()
+      : null;
+  const envio =
+    typeof o.envio === "number" && Number.isFinite(o.envio) ? o.envio : null;
+  const metodoPago =
+    typeof o.metodoPago === "string" && o.metodoPago.trim().length > 0
+      ? o.metodoPago.trim()
+      : null;
+
+  const itemsTotal = items.reduce((s, i) => s + i.precio, 0);
+  const envioCosto = envio ?? 0;
   const total =
     typeof o.total === "number" && Number.isFinite(o.total)
       ? o.total
-      : items.reduce((s, i) => s + i.precio, 0);
+      : itemsTotal + envioCosto;
 
-  return { items, total };
+  return { items, tipoEntrega, distrito, direccion, envio, metodoPago, total };
 }

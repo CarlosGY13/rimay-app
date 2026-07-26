@@ -10,14 +10,14 @@ import {
 } from "@/lib/tenant";
 import { requireSession } from "@/lib/auth/session";
 import { crearConfigInicial } from "@/lib/rubros";
-import type { Rubro, Tono } from "@/lib/types";
+import type { Rubro, Tono, DeliveryMode } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 // Devuelve el negocio del tenant de la sesión con su catálogo y reglas, en la
 // forma que consume el BusinessContext (rubro/tono en valores de la app).
 async function loadBusiness(tenantId: string) {
-  const [tenant, catalogo, reglas] = await Promise.all([
+  const [tenant, catalogo, reglas, zonas] = await Promise.all([
     prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } }),
     prisma.catalogItem.findMany({
       where: { tenantId },
@@ -27,6 +27,10 @@ async function loadBusiness(tenantId: string) {
       where: { tenantId },
       orderBy: { createdAt: "asc" },
     }),
+    prisma.deliveryZone.findMany({
+      where: { tenantId },
+      orderBy: { distrito: "asc" },
+    }),
   ]);
 
   return {
@@ -35,6 +39,13 @@ async function loadBusiness(tenantId: string) {
     tono: dbTonoToApp(tenant.tono),
     catalogo: catalogo.map(dbCatalogItemToApp),
     reglas: reglas.map((r) => ({ id: r.id, text: r.text })),
+    deliveryMode: tenant.deliveryMode as DeliveryMode,
+    paymentMethods: tenant.paymentMethods,
+    zonas: zonas.map((z) => ({
+      id: z.id,
+      distrito: z.distrito,
+      fee: Number(z.fee),
+    })),
   };
 }
 
@@ -61,7 +72,21 @@ export async function PATCH(request: Request) {
       nombre?: string;
       rubro?: Rubro;
       tono?: Tono;
+      deliveryMode?: DeliveryMode;
+      paymentMethods?: string[];
     };
+
+    // Normaliza métodos de pago: strings no vacíos, sin duplicados.
+    const paymentMethods =
+      body.paymentMethods !== undefined
+        ? Array.from(
+            new Set(
+              body.paymentMethods
+                .map((m) => (typeof m === "string" ? m.trim() : ""))
+                .filter((m) => m.length > 0)
+            )
+          )
+        : undefined;
 
     await prisma.tenant.update({
       where: { id: session.tenantId },
@@ -69,6 +94,10 @@ export async function PATCH(request: Request) {
         ...(body.nombre !== undefined ? { name: body.nombre } : {}),
         ...(body.rubro !== undefined ? { rubro: appRubroToDb(body.rubro) } : {}),
         ...(body.tono !== undefined ? { tono: appTonoToDb(body.tono) } : {}),
+        ...(body.deliveryMode !== undefined
+          ? { deliveryMode: body.deliveryMode }
+          : {}),
+        ...(paymentMethods !== undefined ? { paymentMethods } : {}),
       },
     });
 

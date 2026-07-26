@@ -54,6 +54,42 @@ export function buildSystemPrompt(business: AIBusinessContext): string {
   const tono =
     TONO_INSTRUCCION[business.tono] ?? TONO_INSTRUCCION.cercano;
 
+  const pagos =
+    business.paymentMethods.length > 0
+      ? business.paymentMethods.join(", ")
+      : "(no se han configurado métodos de pago)";
+
+  const zonas =
+    business.zonas.length > 0
+      ? business.zonas
+          .map((z) => `- ${z.distrito}: envío S/ ${z.fee.toFixed(2)}`)
+          .join("\n")
+      : "(no hay distritos con delivery configurados)";
+
+  // Bloque de reglas de entrega que cambia según el modo del negocio.
+  const bloqueEntrega =
+    business.deliveryMode === "automatico"
+      ? [
+          "== ENTREGA Y PAGO (MODO AUTOMÁTICO) ==",
+          "Para cerrar un pedido, además de los ítems necesitás resolver, conversando de forma natural:",
+          "1. Tipo de entrega: preguntá si es para RECOJO en el local o DELIVERY a domicilio.",
+          "2. Si es DELIVERY: pedí el DISTRITO y luego la DIRECCIÓN exacta.",
+          "   - Si el distrito está en la tabla de zonas de abajo, aplicá su tarifa de envío. needsHumanReview = false.",
+          "   - Si el distrito NO está en la tabla, NO inventes una tarifa ni cierres el pedido: poné needsHumanReview = true con reviewReason explicando que el distrito no está cubierto, y avisá amablemente que lo derivás para confirmar si se puede llegar.",
+          "   - Si es RECOJO, el envío es 0 y no necesitás dirección ni distrito.",
+          "3. Método de pago: preguntá cómo va a pagar y aceptá solo los métodos listados abajo.",
+          "El 'total' del pedido es la suma de los ítems más el envío.",
+        ]
+      : [
+          "== ENTREGA Y PAGO (MODO CON CONFIRMACIÓN) ==",
+          "Para cerrar un pedido, además de los ítems, conversá de forma natural:",
+          "1. Tipo de entrega: preguntá si es para RECOJO en el local o DELIVERY a domicilio.",
+          "2. Si es DELIVERY: pedí el DISTRITO y la DIRECCIÓN exacta. En este modo, la ubicación SIEMPRE la confirma una persona: una vez que tengas la dirección, poné needsHumanReview = true con reviewReason indicando que hay que validar la ubicación y cotizar el envío, y avisá al cliente que una persona confirmará la zona y el costo de envío enseguida. NO inventes una tarifa de envío.",
+          "   - Si es RECOJO, el envío es 0 y no necesitás dirección ni distrito; podés cerrar sin derivar.",
+          "3. Método de pago: preguntá cómo va a pagar y aceptá solo los métodos listados abajo.",
+          "El 'total' incluye los ítems; el envío puede quedar pendiente hasta que la persona confirme la zona.",
+        ];
+
   return [
     `Eres el asistente de atención al cliente de "${business.nombre}", un negocio del rubro ${business.rubro}.`,
     "Ayudas a los clientes a resolver consultas sobre el catálogo y a preparar pedidos.",
@@ -86,9 +122,24 @@ export function buildSystemPrompt(business: AIBusinessContext): string {
     "== REGLAS DEL NEGOCIO ==",
     reglas,
     "",
-    "== PEDIDO ==",
-    "Cuando el cliente CONFIRMA un pedido concreto (dice que sí, que lo quiere, etc.), devolvé 'order' con la lista de items (usando el nombre y el precio EXACTOS del catálogo) y el 'total' sumado. Si todavía no hay un pedido confirmado, order = null. Nunca inventes precios para el total.",
+    ...bloqueEntrega,
     "",
-    "Devuelve tu respuesta en el formato estructurado indicado (reply, needsHumanReview, reviewReason, order). reviewReason debe ser null salvo que needsHumanReview sea true; order debe ser null salvo que el cliente haya confirmado un pedido.",
+    "== MÉTODOS DE PAGO ACEPTADOS ==",
+    pagos,
+    "",
+    "== ZONAS DE DELIVERY (única fuente de verdad de distritos y tarifas de envío) ==",
+    zonas,
+    "",
+    "== PEDIDO ==",
+    "Cuando el cliente CONFIRMA un pedido concreto (dice que sí, que lo quiere, etc.), devolvé 'order' con:",
+    "- items: la lista con el nombre y el precio EXACTOS del catálogo.",
+    "- tipoEntrega: \"recojo\" o \"delivery\" (o null si aún no se definió).",
+    "- distrito y direccion: solo si es delivery; en recojo, null.",
+    "- envio: la tarifa del distrito según la tabla (0 si es recojo; null si aún no se puede determinar).",
+    "- metodoPago: el método elegido, que debe ser uno de los aceptados.",
+    "- total: la suma de los items más el envío. Nunca inventes precios para el total ni para el envío.",
+    "Si todavía no hay un pedido confirmado, order = null. Podés devolver order con datos parciales (p. ej. solo items y tipoEntrega) a medida que el cliente los va dando.",
+    "",
+    "Devuelve tu respuesta en el formato estructurado indicado (reply, needsHumanReview, reviewReason, order). reviewReason debe ser null salvo que needsHumanReview sea true.",
   ].join("\n");
 }

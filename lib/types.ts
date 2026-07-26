@@ -44,6 +44,22 @@ export type Canales = {
   web: boolean;
 };
 
+// ============================================================
+// Entregas y pagos (delivery por distrito)
+// ============================================================
+
+// Cómo resuelve el agente el envío:
+// - automatico: aplica la tabla de zonas sin intervención humana.
+// - confirmacion: la ubicación la valida una persona antes de cerrar.
+export type DeliveryMode = "automatico" | "confirmacion";
+
+// Tarifa fija de envío para un distrito.
+export type DeliveryZone = {
+  id: string;
+  distrito: string;
+  fee: number;
+};
+
 export type BusinessConfig = {
   rubro: Rubro | null;
   nombre: string;
@@ -52,6 +68,10 @@ export type BusinessConfig = {
   catalogo: CatalogItem[];
   reglas: string[];
   cartaFileName: string | null;
+  // Entregas y pagos
+  deliveryMode: DeliveryMode;
+  paymentMethods: string[];
+  zonas: DeliveryZone[];
 };
 
 // ============================================================

@@ -186,5 +186,8 @@ export function crearConfigInicial(rubro: Rubro): BusinessConfig {
     catalogo: CATALOGOS_EJEMPLO[rubro].map((it) => ({ ...it })),
     reglas: [...REGLAS_EJEMPLO[rubro]],
     cartaFileName: null,
+    deliveryMode: "automatico",
+    paymentMethods: [],
+    zonas: [],
   };
 }

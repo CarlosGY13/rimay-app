@@ -20,6 +20,9 @@ export async function GET() {
         tono: "cercano",
         catalogo: [],
         reglas: [],
+        deliveryMode: "automatico",
+        paymentMethods: [],
+        zonas: [],
       },
     });
 

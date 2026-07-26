@@ -30,6 +30,9 @@ const SERVER_CONFIG: BusinessConfig = {
   ],
   reglas: catalogData.reglas,
   cartaFileName: null,
+  deliveryMode: "automatico",
+  paymentMethods: [],
+  zonas: [],
 };
 
 export async function POST(request: Request) {

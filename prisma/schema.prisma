@@ -48,6 +48,15 @@ enum ConversationStatus {
   completado
 }
 
+// Cómo resuelve el agente el envío a domicilio:
+// - automatico: aplica la tabla de zonas sin intervención humana.
+// - confirmacion: la ubicación del cliente la valida una persona antes de
+//   cerrar el envío (luego el agente continúa).
+enum DeliveryMode {
+  automatico
+  confirmacion
+}
+
 enum Sender {
   cliente
   agente
@@ -65,17 +74,45 @@ model Tenant {
   slug      String   @unique
   rubro     Rubro
   tono      Tono     @default(cercano)
+  // Config de entregas y pagos (flujo de delivery por distrito).
+  deliveryMode   DeliveryMode @default(automatico) @map("delivery_mode")
+  // Métodos de pago aceptados (ej. ["efectivo", "Yape", "Plin"]).
+  paymentMethods String[]     @default([]) @map("payment_methods")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   catalogItems       CatalogItem[]
   businessRules      BusinessRule[]
+  deliveryZones      DeliveryZone[]
   conversations      Conversation[]
   insights           ConversationInsight[]
   insightAggregation InsightAggregation?
   user               User?
 
   @@map("tenants")
+}
+
+// ------------------------------------------------------------
+// DeliveryZone: tarifa fija de envío por distrito (enfoque gratuito,
+// sin geolocalización). La presencia de una fila = "llegamos a ese
+// distrito por esa tarifa"; si un distrito no está en la tabla, el
+// agente no cierra el envío y escala a una persona.
+// ------------------------------------------------------------
+
+model DeliveryZone {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  distrito  String
+  fee       Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Un distrito no se repite dentro de un mismo negocio.
+  @@unique([tenantId, distrito])
+  @@index([tenantId])
+  @@map("delivery_zones")
 }
 
 // ------------------------------------------------------------

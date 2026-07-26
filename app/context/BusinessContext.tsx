@@ -17,6 +17,8 @@ import type {
   Rubro,
   Tono,
   Canales,
+  DeliveryMode,
+  DeliveryZone,
 } from "@/lib/types";
 import { crearConfigInicial, CANALES_DEFAULT } from "@/lib/rubros";
 
@@ -28,6 +30,9 @@ const CONFIG_VACIA: BusinessConfig = {
   catalogo: [],
   reglas: [],
   cartaFileName: null,
+  deliveryMode: "automatico",
+  paymentMethods: [],
+  zonas: [],
 };
 
 // Genera un id temporal ÚNICO para updates optimistas. Un contador evita
@@ -47,6 +52,9 @@ type BusinessApi = {
   tono: Tono;
   catalogo: CatalogItem[];
   reglas: ReglaApi[];
+  deliveryMode: DeliveryMode;
+  paymentMethods: string[];
+  zonas: DeliveryZone[];
 };
 
 type BusinessContextValue = {
@@ -74,6 +82,11 @@ type BusinessContextValue = {
   removeRegla: (index: number) => void;
   // carta visual
   setCartaFileName: (nombre: string | null) => void;
+  // entregas y pagos
+  setDeliveryMode: (mode: DeliveryMode) => void;
+  togglePago: (metodo: string) => void;
+  addZona: (distrito: string, fee: number) => void;
+  removeZona: (id: string) => void;
   // conversaciones (inbox)
   conversaciones: Conversacion[];
   addConversacion: (conv: Omit<Conversacion, "id">) => void;
@@ -126,6 +139,9 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       tono: data.tono,
       catalogo: data.catalogo,
       reglas: data.reglas.map((r) => r.text),
+      deliveryMode: data.deliveryMode,
+      paymentMethods: data.paymentMethods,
+      zonas: data.zonas,
     }));
     setRuleIds(data.reglas.map((r) => r.id));
   }, []);
@@ -373,6 +389,108 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     setConfig((prev) => ({ ...prev, cartaFileName: nombre }));
   }, []);
 
+  // ---- Entregas y pagos ----
+  const setDeliveryMode = useCallback(
+    (mode: DeliveryMode) => {
+      const prev = config.deliveryMode;
+      setConfig((c) => ({ ...c, deliveryMode: mode }));
+      apiJson<BusinessApi>("/api/business", {
+        method: "PATCH",
+        body: JSON.stringify({ deliveryMode: mode }),
+      }).catch(() => {
+        setConfig((c) => ({ ...c, deliveryMode: prev }));
+        flashActionError("No se pudo cambiar el modo de entrega.");
+      });
+    },
+    [config.deliveryMode, flashActionError]
+  );
+
+  const togglePago = useCallback(
+    (metodo: string) => {
+      let snapshot: string[] = [];
+      let siguiente: string[] = [];
+      setConfig((prev) => {
+        snapshot = prev.paymentMethods;
+        siguiente = prev.paymentMethods.includes(metodo)
+          ? prev.paymentMethods.filter((m) => m !== metodo)
+          : [...prev.paymentMethods, metodo];
+        return { ...prev, paymentMethods: siguiente };
+      });
+
+      apiJson<BusinessApi>("/api/business", {
+        method: "PATCH",
+        body: JSON.stringify({ paymentMethods: siguiente }),
+      }).catch(() => {
+        setConfig((prev) => ({ ...prev, paymentMethods: snapshot }));
+        flashActionError("No se pudo actualizar los métodos de pago.");
+      });
+    },
+    [flashActionError]
+  );
+
+  const addZona = useCallback(
+    (distrito: string, fee: number) => {
+      const limpio = distrito.trim();
+      if (limpio.length === 0 || !Number.isFinite(fee) || fee < 0) {
+        flashActionError("Ingresa un distrito y una tarifa válida.");
+        return;
+      }
+      // Evita duplicados locales (case-insensitive) antes de llamar a la API.
+      if (
+        config.zonas.some(
+          (z) => z.distrito.toLowerCase() === limpio.toLowerCase()
+        )
+      ) {
+        flashActionError("Ese distrito ya tiene una tarifa.");
+        return;
+      }
+
+      const tempId = nuevoTempId();
+      setConfig((prev) => ({
+        ...prev,
+        zonas: [...prev.zonas, { id: tempId, distrito: limpio, fee }],
+      }));
+
+      apiJson<DeliveryZone>("/api/business/zones", {
+        method: "POST",
+        body: JSON.stringify({ distrito: limpio, fee }),
+      })
+        .then((saved) => {
+          setConfig((prev) => ({
+            ...prev,
+            zonas: prev.zonas
+              .map((z) => (z.id === tempId ? saved : z))
+              .sort((a, b) => a.distrito.localeCompare(b.distrito)),
+          }));
+        })
+        .catch(() => {
+          setConfig((prev) => ({
+            ...prev,
+            zonas: prev.zonas.filter((z) => z.id !== tempId),
+          }));
+          flashActionError("No se pudo agregar la zona.");
+        });
+    },
+    [config.zonas, flashActionError]
+  );
+
+  const removeZona = useCallback(
+    (id: string) => {
+      let snapshot: DeliveryZone[] = [];
+      setConfig((prev) => {
+        snapshot = prev.zonas;
+        return { ...prev, zonas: prev.zonas.filter((z) => z.id !== id) };
+      });
+
+      if (id.startsWith("temp-")) return;
+      apiJson(`/api/business/zones/${id}`, { method: "DELETE" }).catch(() => {
+        setConfig((prev) => ({ ...prev, zonas: snapshot }));
+        flashActionError("No se pudo eliminar la zona.");
+      });
+    },
+    [flashActionError]
+  );
+
   // ---- Conversaciones ----
   const addConversacion = useCallback(
     (conv: Omit<Conversacion, "id">) => {
@@ -427,6 +545,10 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       persistRegla,
       removeRegla,
       setCartaFileName,
+      setDeliveryMode,
+      togglePago,
+      addZona,
+      removeZona,
       conversaciones,
       addConversacion,
       guardado,
@@ -454,6 +576,10 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       persistRegla,
       removeRegla,
       setCartaFileName,
+      setDeliveryMode,
+      togglePago,
+      addZona,
+      removeZona,
       addConversacion,
       save,
     ]

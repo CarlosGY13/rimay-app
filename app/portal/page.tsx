@@ -54,6 +54,10 @@ function PortalContent() {
     updateRegla,
     persistRegla,
     removeRegla,
+    setDeliveryMode,
+    togglePago,
+    addZona,
+    removeZona,
     guardado,
     saveError,
     actionError,
@@ -65,6 +69,9 @@ function PortalContent() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [itemEditando, setItemEditando] = useState<CatalogItem | null>(null);
   const [nuevaRegla, setNuevaRegla] = useState("");
+  const [nuevoDistrito, setNuevoDistrito] = useState("");
+  const [nuevaTarifa, setNuevaTarifa] = useState("");
+  const [nuevoPago, setNuevoPago] = useState("");
 
   function abrirNuevo() {
     setItemEditando(null);
@@ -99,6 +106,22 @@ function PortalContent() {
     if (texto.length === 0) return;
     addRegla(texto);
     setNuevaRegla("");
+  }
+
+  function agregarZona() {
+    const distrito = nuevoDistrito.trim();
+    const fee = parseFloat(nuevaTarifa.replace(",", "."));
+    if (distrito.length === 0 || !Number.isFinite(fee) || fee < 0) return;
+    addZona(distrito, fee);
+    setNuevoDistrito("");
+    setNuevaTarifa("");
+  }
+
+  function agregarPago() {
+    const metodo = nuevoPago.trim();
+    if (metodo.length === 0) return;
+    togglePago(metodo);
+    setNuevoPago("");
   }
 
   return (
@@ -301,7 +324,159 @@ function PortalContent() {
           </div>
         </SectionCard>
 
+        {/* ---- Entregas y pagos ---- */}
+        <SectionCard
+          title="Entregas y pagos"
+          description="Define cómo se resuelve el envío y qué métodos de pago aceptas."
+        >
+          {/* Modo de entrega */}
+          <Field label="Modo de entrega a domicilio">
+            <Select
+              value={config.deliveryMode}
+              onChange={(e) =>
+                setDeliveryMode(e.target.value as typeof config.deliveryMode)
+              }
+            >
+              <option value="automatico">
+                Automático — aplica la tabla de distritos
+              </option>
+              <option value="confirmacion">
+                Con confirmación — una persona valida la ubicación
+              </option>
+            </Select>
+          </Field>
+          <p className="mt-1.5 text-xs text-ink-400">
+            {config.deliveryMode === "automatico"
+              ? "El agente cobra el envío según la tabla. Si el distrito no está listado, deriva a una persona."
+              : "El agente toma el pedido y la dirección, y deriva a una persona para confirmar la ubicación antes de cerrar el envío."}
+          </p>
 
+          {/* Métodos de pago */}
+          <div className="mt-6">
+            <span className="mb-2 block text-sm font-medium text-ink-700">
+              Métodos de pago aceptados
+            </span>
+            {config.paymentMethods.length === 0 ? (
+              <p className="mb-2 text-xs text-ink-400">
+                Aún no agregaste métodos de pago.
+              </p>
+            ) : (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {config.paymentMethods.map((metodo) => (
+                  <span
+                    key={metodo}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-brand-300 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700"
+                  >
+                    {metodo}
+                    <button
+                      type="button"
+                      onClick={() => togglePago(metodo)}
+                      className="rounded p-0.5 text-brand-500 transition-colors hover:bg-brand-100 hover:text-brand-700"
+                      aria-label={`Quitar ${metodo}`}
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                value={nuevoPago}
+                onChange={(e) => setNuevoPago(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    agregarPago();
+                  }
+                }}
+                placeholder="Ej. Yape, efectivo, tarjeta…"
+              />
+              <Button variant="secondary" onClick={agregarPago}>
+                <PlusIcon className="h-4 w-4" />
+                Agregar
+              </Button>
+            </div>
+          </div>
+
+          {/* Tabla de zonas de delivery */}
+          <div className="mt-6">
+            <span className="mb-1 block text-sm font-medium text-ink-700">
+              Tarifas de envío por distrito
+            </span>
+            <p className="mb-2 text-xs text-ink-400">
+              Solo se ofrece delivery a los distritos listados. Un distrito
+              fuera de la tabla se deriva a una persona.
+            </p>
+            {config.zonas.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-ink-200 py-8 text-center text-sm text-ink-400">
+                Aún no hay zonas. Agrega la primera abajo.
+              </p>
+            ) : (
+              <ul className="divide-y divide-ink-100">
+                {config.zonas.map((zona) => (
+                  <li
+                    key={zona.id}
+                    className="group flex items-center justify-between gap-3 py-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-ink-900">
+                        {zona.distrito}
+                      </span>
+                      <Badge tone="neutral">
+                        Envío S/ {zona.fee.toFixed(2)}
+                      </Badge>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeZona(zona.id)}
+                      className="rounded-lg p-2 text-ink-400 opacity-70 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                      aria-label={`Eliminar ${zona.distrito}`}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Input
+                type="text"
+                value={nuevoDistrito}
+                onChange={(e) => setNuevoDistrito(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    agregarZona();
+                  }
+                }}
+                placeholder="Distrito (ej. Miraflores)"
+                className="sm:flex-1"
+              />
+              <Input
+                type="number"
+                min="0"
+                step="0.5"
+                value={nuevaTarifa}
+                onChange={(e) => setNuevaTarifa(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    agregarZona();
+                  }
+                }}
+                placeholder="Tarifa S/"
+                className="sm:w-32"
+              />
+              <Button variant="secondary" onClick={agregarZona}>
+                <PlusIcon className="h-4 w-4" />
+                Agregar
+              </Button>
+            </div>
+          </div>
+        </SectionCard>
       </div>
 
       {/* ---- Barra de guardado ---- */}

@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     const tenant = await prisma.tenant.findUniqueOrThrow({
       where: { id: session.tenantId },
     });
-    const [catalogo, reglas] = await Promise.all([
+    const [catalogo, reglas, zonas] = await Promise.all([
       prisma.catalogItem.findMany({
         where: { tenantId: tenant.id },
         orderBy: { createdAt: "asc" },
@@ -52,6 +52,10 @@ export async function POST(request: Request) {
       prisma.businessRule.findMany({
         where: { tenantId: tenant.id },
         orderBy: { createdAt: "asc" },
+      }),
+      prisma.deliveryZone.findMany({
+        where: { tenantId: tenant.id },
+        orderBy: { distrito: "asc" },
       }),
     ]);
 
@@ -72,6 +76,9 @@ export async function POST(request: Request) {
         };
       }),
       reglas: reglas.map((r) => r.text),
+      deliveryMode: tenant.deliveryMode,
+      paymentMethods: tenant.paymentMethods,
+      zonas: zonas.map((z) => ({ distrito: z.distrito, fee: Number(z.fee) })),
     };
 
     const history = Array.isArray(body.history)

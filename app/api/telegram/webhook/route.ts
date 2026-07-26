@@ -15,7 +15,7 @@ import {
   updateOrderInfo,
 } from "@/lib/conversationStore";
 import { generarRespuestaIA } from "@/lib/ai/engine";
-import type { AIBusinessContext, AIMessage } from "@/lib/ai/provider";
+import type { AIBusinessContext, AIMessage, AIResponse } from "@/lib/ai/provider";
 import { sendTelegramMessage, type TelegramUpdate } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ const MAX_HISTORY = 10;
 // Carga el contexto de negocio (tenant fijo) para el motor de IA.
 async function loadBusinessContext(): Promise<AIBusinessContext> {
   const tenant = await getFixedTenant();
-  const [catalogo, reglas] = await Promise.all([
+  const [catalogo, reglas, zonas] = await Promise.all([
     prisma.catalogItem.findMany({
       where: { tenantId: tenant.id },
       orderBy: { createdAt: "asc" },
@@ -33,6 +33,10 @@ async function loadBusinessContext(): Promise<AIBusinessContext> {
     prisma.businessRule.findMany({
       where: { tenantId: tenant.id },
       orderBy: { createdAt: "asc" },
+    }),
+    prisma.deliveryZone.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { distrito: "asc" },
     }),
   ]);
 
@@ -53,7 +57,37 @@ async function loadBusinessContext(): Promise<AIBusinessContext> {
       };
     }),
     reglas: reglas.map((r) => r.text),
+    deliveryMode: tenant.deliveryMode,
+    paymentMethods: tenant.paymentMethods,
+    zonas: zonas.map((z) => ({ distrito: z.distrito, fee: Number(z.fee) })),
   };
+}
+
+// Arma un resumen legible del pedido para el operador (inbox): ítems, tipo de
+// entrega, distrito/dirección, método de pago y desglose de envío.
+function buildOrderSummary(order: NonNullable<AIResponse["order"]>): string {
+  const partes: string[] = [];
+
+  const items = order.items
+    .map((i) => `${i.nombre} (S/ ${i.precio.toFixed(2)})`)
+    .join(", ");
+  partes.push(items);
+
+  if (order.tipoEntrega === "recojo") {
+    partes.push("Entrega: recojo en local");
+  } else if (order.tipoEntrega === "delivery") {
+    const destino = [order.distrito, order.direccion]
+      .filter((x): x is string => !!x)
+      .join(" - ");
+    partes.push(`Entrega: delivery${destino ? ` a ${destino}` : ""}`);
+    if (order.envio !== null) {
+      partes.push(`Envío: S/ ${order.envio.toFixed(2)}`);
+    }
+  }
+
+  if (order.metodoPago) partes.push(`Pago: ${order.metodoPago}`);
+
+  return partes.join(" · ");
 }
 
 // Webhook de Telegram. Telegram hace POST acá con cada update. Validamos el
@@ -110,12 +144,13 @@ export async function POST(request: Request) {
 
     await addMessage(conv.id, "agent", res.text);
 
-    // Si el cliente confirmó un pedido, guardamos items + total (se ve en el inbox).
+    // Si el cliente confirmó un pedido, guardamos resumen + total (se ve en el inbox).
     if (res.order) {
-      const resumenPedido = res.order.items
-        .map((i) => `${i.nombre} (S/ ${i.precio.toFixed(2)})`)
-        .join(", ");
-      await updateOrderInfo(conv.id, resumenPedido, res.order.total);
+      await updateOrderInfo(
+        conv.id,
+        buildOrderSummary(res.order),
+        res.order.total
+      );
     }
     if (res.needsHumanReview) {
       await markNeedsReview(conv.id, res.reviewReason ?? undefined);

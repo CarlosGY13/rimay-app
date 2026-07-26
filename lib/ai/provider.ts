@@ -1,4 +1,4 @@
-import type { Tono } from "@/lib/types";
+import type { Tono, DeliveryMode } from "@/lib/types";
 
 // ============================================================
 // Capa de abstracción de proveedor de IA
@@ -31,6 +31,12 @@ export type AICatalogItem = {
   duracion?: string;
 };
 
+// Zona de delivery tal como la necesita el prompt (distrito + tarifa).
+export type AIDeliveryZone = {
+  distrito: string;
+  fee: number;
+};
+
 // Contexto del negocio (persistido en Postgres desde la Tarea 3).
 export type AIBusinessContext = {
   nombre: string;
@@ -38,6 +44,10 @@ export type AIBusinessContext = {
   tono: Tono;
   catalogo: AICatalogItem[];
   reglas: string[];
+  // Entregas y pagos
+  deliveryMode: DeliveryMode;
+  paymentMethods: string[];
+  zonas: AIDeliveryZone[];
 };
 
 export type AIRequest = {
@@ -50,7 +60,20 @@ export type AIRequest = {
 };
 
 export type AIOrderItem = { nombre: string; precio: number };
-export type AIOrder = { items: AIOrderItem[]; total: number };
+export type AIOrder = {
+  items: AIOrderItem[];
+  // Tipo de entrega elegido por el cliente.
+  tipoEntrega: "recojo" | "delivery" | null;
+  // Datos de envío (solo relevantes si tipoEntrega === "delivery").
+  distrito: string | null;
+  direccion: string | null;
+  // Costo de envío tomado de la tabla de zonas (0 si es recojo).
+  envio: number | null;
+  // Método de pago elegido (debe ser uno de los aceptados).
+  metodoPago: string | null;
+  // Total final = suma de items + envío.
+  total: number;
+};
 
 export type AIResponse = {
   // Texto de respuesta que se le muestra al cliente.

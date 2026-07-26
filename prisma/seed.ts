@@ -23,12 +23,15 @@ async function main() {
       slug: TENANT_SLUG,
       rubro: "restaurante",
       tono: "cercano",
+      deliveryMode: "automatico",
+      paymentMethods: ["efectivo", "Yape", "Plin"],
     },
   });
 
   // Reset de datos derivados para que el seed sea repetible sin duplicar.
   await prisma.catalogItem.deleteMany({ where: { tenantId: tenant.id } });
   await prisma.businessRule.deleteMany({ where: { tenantId: tenant.id } });
+  await prisma.deliveryZone.deleteMany({ where: { tenantId: tenant.id } });
 
   await prisma.catalogItem.createMany({
     data: [
@@ -72,6 +75,15 @@ async function main() {
     ],
   });
 
+  // Zonas de delivery de ejemplo (distrito + tarifa fija).
+  await prisma.deliveryZone.createMany({
+    data: [
+      { tenantId: tenant.id, distrito: "Miraflores", fee: 8 },
+      { tenantId: tenant.id, distrito: "San Isidro", fee: 9 },
+      { tenantId: tenant.id, distrito: "Surco", fee: 12 },
+    ],
+  });
+
   // Usuario dueño del negocio (idempotente por email). Contraseña hasheada.
   const passwordHash = await bcrypt.hash(DEV_USER_PASSWORD, 10);
   await prisma.user.upsert({
@@ -82,8 +94,9 @@ async function main() {
 
   const items = await prisma.catalogItem.count({ where: { tenantId: tenant.id } });
   const rules = await prisma.businessRule.count({ where: { tenantId: tenant.id } });
+  const zones = await prisma.deliveryZone.count({ where: { tenantId: tenant.id } });
   console.log(
-    `Seed OK: tenant "${tenant.name}" (${tenant.slug}) con ${items} ítems y ${rules} reglas.`
+    `Seed OK: tenant "${tenant.name}" (${tenant.slug}) con ${items} ítems, ${rules} reglas y ${zones} zonas de delivery.`
   );
   console.log(`Usuario de desarrollo: ${DEV_USER_EMAIL} / ${DEV_USER_PASSWORD}`);
 }
