@@ -6,6 +6,8 @@ export type InboxMetrics = {
   pedidosHoy: number; // integer count
   ticketPromedio: number; // 2 decimal places
   derivadosHumano: number; // integer count
+  pendientes: number; // integer count (nuevo + preparacion)
+  resueltos: number; // integer count (completado)
 };
 
 export function useInboxMetrics(conversaciones: Conversacion[]): InboxMetrics {
@@ -18,11 +20,21 @@ export function useInboxMetrics(conversaciones: Conversacion[]): InboxMetrics {
         pedidosHoy: 0,
         ticketPromedio: 0,
         derivadosHumano: 0,
+        pendientes: 0,
+        resueltos: 0,
       };
     }
 
     const derivadosHumano = conversaciones.filter(
       (c) => c.estado === "revision"
+    ).length;
+
+    const pendientes = conversaciones.filter(
+      (c) => c.estado === "nuevo" || c.estado === "preparacion"
+    ).length;
+
+    const resueltos = conversaciones.filter(
+      (c) => c.estado === "completado"
     ).length;
 
     const tasaContencion = Math.round(((total - derivadosHumano) / total) * 100);
@@ -40,6 +52,8 @@ export function useInboxMetrics(conversaciones: Conversacion[]): InboxMetrics {
       pedidosHoy,
       ticketPromedio,
       derivadosHumano,
+      pendientes,
+      resueltos,
     };
   }, [conversaciones]);
 }

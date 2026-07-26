@@ -6,22 +6,21 @@ import PageHeader from "@/app/components/PageHeader";
 import { Card } from "@/app/components/ui/Card";
 import { useBusiness } from "@/app/context/BusinessContext";
 import type { Rubro } from "@/lib/types";
-import { SparklesIcon, ClockIcon, AlertIcon } from "@/app/components/icons";
+import { SparklesIcon, AlertIcon } from "@/app/components/icons";
 
 type MetricaRubro = {
   resueltas: string; // % de conversaciones resueltas sin intervención humana
-  tiempoAhorrado: string; // tiempo estimado ahorrado esta semana
   escalados: string; // casos escalados a revisión humana
 };
 
 // MOCK: reemplazar con métricas reales calculadas desde conversaciones/analytics.
 // Por ahora son valores fijos y plausibles según el rubro configurado.
 const METRICAS_POR_RUBRO: Record<Rubro, MetricaRubro> = {
-  restaurante: { resueltas: "82%", tiempoAhorrado: "9 h", escalados: "5" },
-  ropa: { resueltas: "76%", tiempoAhorrado: "6 h", escalados: "8" },
-  veterinaria: { resueltas: "68%", tiempoAhorrado: "5 h", escalados: "11" },
-  belleza: { resueltas: "74%", tiempoAhorrado: "7 h", escalados: "9" },
-  generico: { resueltas: "70%", tiempoAhorrado: "6 h", escalados: "7" },
+  restaurante: { resueltas: "82%", escalados: "5" },
+  ropa: { resueltas: "76%", escalados: "8" },
+  veterinaria: { resueltas: "68%", escalados: "11" },
+  belleza: { resueltas: "74%", escalados: "9" },
+  generico: { resueltas: "70%", escalados: "7" },
 };
 
 type TarjetaMeta = {
@@ -41,14 +40,6 @@ const TARJETAS: TarjetaMeta[] = [
     icon: SparklesIcon,
     acento: "text-brand-600",
     fondoIcono: "bg-brand-50",
-  },
-  {
-    titulo: "Tiempo ahorrado esta semana",
-    descripcion: "Estimación de horas que tu equipo no dedicó a responder.",
-    valor: (m) => m.tiempoAhorrado,
-    icon: ClockIcon,
-    acento: "text-emerald-600",
-    fondoIcono: "bg-emerald-50",
   },
   {
     titulo: "Casos escalados a revisión",
@@ -73,7 +64,7 @@ function ResumenContent() {
         description="Una vista simulada del valor que Rimay genera para tu negocio."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         {TARJETAS.map((t) => {
           const Icon = t.icon;
           return (

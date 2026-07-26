@@ -22,12 +22,13 @@ import {
   GlobeIcon,
 } from "@/app/components/icons";
 
-type Filtro = "todos" | "nuevo" | "revision";
+type Filtro = "todos" | "pendientes" | "revision" | "completado";
 
 const TABS: { value: Filtro; label: string }[] = [
   { value: "todos", label: "Todos" },
-  { value: "nuevo", label: "Nuevos" },
-  { value: "revision", label: "Requieren revisión" },
+  { value: "pendientes", label: "Pendientes" },
+  { value: "revision", label: "Requiere atención" },
+  { value: "completado", label: "Resueltos" },
 ];
 
 type EstadoMeta = {
@@ -107,15 +108,33 @@ function InboxContent() {
   const metrics = useInboxMetrics(conversaciones);
 
   const visibles = useMemo(() => {
-    const lista =
-      filtro === "todos"
-        ? conversaciones
-        : conversaciones.filter((c) => c.estado === filtro);
+    let lista: Conversacion[];
+    switch (filtro) {
+      case "pendientes":
+        lista = conversaciones.filter(
+          (c) => c.estado === "nuevo" || c.estado === "preparacion"
+        );
+        break;
+      case "revision":
+        lista = conversaciones.filter((c) => c.estado === "revision");
+        break;
+      case "completado":
+        lista = conversaciones.filter((c) => c.estado === "completado");
+        break;
+      default:
+        lista = conversaciones;
+    }
     return [...lista].sort((a, b) => a.minutosAtras - b.minutosAtras);
   }, [conversaciones, filtro]);
 
+  const conteoPendientes = conversaciones.filter(
+    (c) => c.estado === "nuevo" || c.estado === "preparacion"
+  ).length;
   const conteoRevision = conversaciones.filter(
     (c) => c.estado === "revision"
+  ).length;
+  const conteoResueltos = conversaciones.filter(
+    (c) => c.estado === "completado"
   ).length;
 
   function tomarChat(id: string) {
@@ -129,6 +148,36 @@ function InboxContent() {
         ...prev,
         [id]: { estado: "preparacion" },
       }));
+    }
+  }
+
+  async function marcarResuelto(id: string) {
+    // Optimistic update
+    setLocalOverrides((prev) => ({
+      ...prev,
+      [id]: { estado: "completado" },
+    }));
+    try {
+      const res = await fetch("/api/chat/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: id }),
+      });
+      if (!res.ok) {
+        // Revert on failure
+        setLocalOverrides((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    } catch {
+      // Revert on error
+      setLocalOverrides((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     }
   }
 
@@ -147,10 +196,13 @@ function InboxContent() {
       <div className="mb-5 flex flex-wrap gap-2">
         {TABS.map((tab) => {
           const activo = filtro === tab.value;
-          const badge =
-            tab.value === "revision" && conteoRevision > 0
-              ? conteoRevision
-              : null;
+          let badge: number | null = null;
+          if (tab.value === "pendientes" && conteoPendientes > 0)
+            badge = conteoPendientes;
+          if (tab.value === "revision" && conteoRevision > 0)
+            badge = conteoRevision;
+          if (tab.value === "completado" && conteoResueltos > 0)
+            badge = conteoResueltos;
           return (
             <button
               key={tab.value}
@@ -168,7 +220,11 @@ function InboxContent() {
                 <span
                   className={[
                     "rounded-full px-1.5 text-xs font-semibold",
-                    activo ? "bg-white/20" : "bg-red-100 text-red-700",
+                    activo
+                      ? "bg-white/20"
+                      : tab.value === "revision"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-ink-100 text-ink-600",
                   ].join(" ")}
                 >
                   {badge}
@@ -248,6 +304,15 @@ function InboxContent() {
                           onClick={() => setPanelSessionId(conv.id)}
                         >
                           Ver chat
+                        </Button>
+                      )}
+                      {conv.estado !== "completado" && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => marcarResuelto(conv.id)}
+                        >
+                          Marcar como resuelto
                         </Button>
                       )}
                     </div>
