@@ -36,6 +36,11 @@ services:
     # Instala deps (en el volumen del contenedor), aplica migraciones pendientes
     # y arranca Next en modo dev escuchando en todas las interfaces.
     command: sh -lc "npm install && npx prisma migrate deploy && npx next dev -H 0.0.0.0 -p 3000"
+    # next dev escucha stdin (atajos de teclado del modo dev). Sin TTY, bajo
+    # `docker compose up` recibe EOF y se cierra solo ("exited with code 0").
+    # Con stdin_open + tty se mantiene corriendo.
+    stdin_open: true
+    tty: true
     environment:
       NODE_ENV: development
       # Dentro de la red de Docker la DB es el servicio "postgres".
