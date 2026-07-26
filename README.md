@@ -96,3 +96,47 @@ El modelo vive en `prisma/schema.prisma` (multi-tenant: una sola base con `tenan
 - `npx prisma migrate deploy` — aplica migraciones pendientes
 - `npx prisma db seed` — carga los datos de ejemplo
 - `npx prisma studio` — explorador visual de la base
+
+## Integración con Telegram (opcional)
+
+El agente puede atender por un bot de Telegram. Los mensajes del cliente pasan por el mismo motor de IA (con tu catálogo) y las conversaciones aparecen en el Inbox como canal **Telegram**; si el agente necesita ayuda, quedan para revisión y un operador puede tomarlas.
+
+### 1. Crear el bot
+
+En Telegram, hablale a [@BotFather](https://t.me/BotFather), enviá `/newbot`, seguí los pasos y copiá el **token** que te da.
+
+### 2. Configurar el token
+
+En `.env`:
+
+```
+TELEGRAM_BOT_TOKEN=<el token de BotFather>
+TELEGRAM_WEBHOOK_SECRET=<una cadena aleatoria cualquiera>
+```
+
+Reiniciá la app para que tome las variables.
+
+### 3. Exponer el webhook
+
+Telegram necesita una URL pública HTTPS que apunte a `/api/telegram/webhook`.
+
+- **En producción**: es directamente la URL de tu deploy, ej. `https://tu-dominio.com/api/telegram/webhook`.
+- **En local**: levantá un túnel gratis a `localhost:3000`. Con [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/):
+
+  ```bash
+  cloudflared tunnel --url http://localhost:3000
+  ```
+
+  Te da una URL tipo `https://algo-al-azar.trycloudflare.com`.
+
+### 4. Registrar el webhook en Telegram
+
+Una sola vez (reemplazá el token, la URL y el secret):
+
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL_PUBLICA>/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+```
+
+Listo: escribile a tu bot en Telegram y debería responder con la info de tu catálogo. Las conversaciones aparecen en `/inbox`.
+
+> El webhook valida el `secret_token` en cada request (header `x-telegram-bot-api-secret-token`), así nadie más puede dispararlo.

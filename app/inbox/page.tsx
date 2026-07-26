@@ -20,6 +20,7 @@ import {
   WhatsappIcon,
   InstagramIcon,
   GlobeIcon,
+  TelegramIcon,
 } from "@/app/components/icons";
 
 type Filtro = "todos" | "nuevo" | "revision";
@@ -49,6 +50,7 @@ const CANAL: Record<
   whatsapp: { label: "WhatsApp", icon: WhatsappIcon },
   instagram: { label: "Instagram", icon: InstagramIcon },
   web: { label: "Web", icon: GlobeIcon },
+  telegram: { label: "Telegram", icon: TelegramIcon },
 };
 
 function tiempoRelativo(min: number): string {
