@@ -92,6 +92,18 @@ export async function conversationTenantId(
   return conv?.tenantId ?? null;
 }
 
+// Devuelve el canal y el id externo (ej. chat_id de Telegram) de una
+// conversación, para saber por dónde entregar la respuesta del operador.
+export async function conversationRouting(
+  sessionId: string
+): Promise<{ channel: DbChannel; externalId: string | null } | null> {
+  const conv = await prisma.conversation.findUnique({
+    where: { id: sessionId },
+    select: { channel: true, externalId: true },
+  });
+  return conv ?? null;
+}
+
 export async function getSession(
   sessionId: string
 ): Promise<WidgetSession | undefined> {

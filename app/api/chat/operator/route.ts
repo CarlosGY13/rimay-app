@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
+import { Channel } from "@prisma/client";
 import {
   getSession as getConversation,
   addMessage,
   pauseSession,
   conversationTenantId,
+  conversationRouting,
 } from "@/lib/conversationStore";
 import { requireSession } from "@/lib/auth/session";
+import { sendTelegramMessage } from "@/lib/telegram";
 
 export async function POST(request: Request) {
   // Ruta sensible: requiere sesión de dueño y que la conversación sea suya.
@@ -54,9 +57,17 @@ export async function POST(request: Request) {
       await pauseSession(sessionId);
     }
 
-    // Si viene un mensaje del operador, lo agrega al historial.
+    // Si viene un mensaje del operador, lo agrega al historial y —según el
+    // canal— lo entrega al cliente. En web el cliente lo lee por polling; en
+    // Telegram hay que empujarlo por la Bot API (no hace polling).
     if (message && message.trim().length > 0) {
-      await addMessage(sessionId, "operator", message.trim());
+      const texto = message.trim();
+      await addMessage(sessionId, "operator", texto);
+
+      const routing = await conversationRouting(sessionId);
+      if (routing?.channel === Channel.telegram && routing.externalId) {
+        await sendTelegramMessage(routing.externalId, texto);
+      }
     }
 
     // Re-lee el estado actualizado (mensajes + paused) para devolverlo.
