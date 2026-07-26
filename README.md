@@ -121,13 +121,13 @@ Reiniciá la app para que tome las variables.
 Telegram necesita una URL pública HTTPS que apunte a `/api/telegram/webhook`.
 
 - **En producción**: es directamente la URL de tu deploy, ej. `https://tu-dominio.com/api/telegram/webhook`.
-- **En local**: levantá un túnel gratis a `localhost:3000`. Con [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/):
+- **En local, sin instalar nada (usando Docker)**: con la app ya corriendo, levantá un túnel gratis en un contenedor:
 
   ```bash
-  cloudflared tunnel --url http://localhost:3000
+  docker run --rm --network rimay-app_rimay cloudflare/cloudflared:latest tunnel --url http://app:3000
   ```
 
-  Te da una URL tipo `https://algo-al-azar.trycloudflare.com`.
+  Imprime una URL tipo `https://algo-al-azar.trycloudflare.com`. Copiala. Dejá esa terminal abierta mientras uses el bot. (La URL cambia cada vez que reiniciás el túnel, así que hay que repetir el paso 4.)
 
 ### 4. Registrar el webhook en Telegram
 
