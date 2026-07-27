@@ -77,17 +77,18 @@ export function buildSystemPrompt(business: AIBusinessContext): string {
           "   - Si el distrito está en la tabla de zonas de abajo, aplicá su tarifa de envío. needsHumanReview = false.",
           "   - Si el distrito NO está en la tabla, NO inventes una tarifa ni cierres el pedido: poné needsHumanReview = true con reviewReason explicando que el distrito no está cubierto, y avisá amablemente que lo derivás para confirmar si se puede llegar.",
           "   - Si es RECOJO, el envío es 0 y no necesitás dirección ni distrito.",
-          "3. Método de pago: preguntá cómo va a pagar y aceptá solo los métodos listados abajo.",
+          "3. MÉTODO DE PAGO (OBLIGATORIO): SIEMPRE, tanto en recojo como en delivery, preguntá cómo va a pagar y aceptá solo los métodos listados abajo. NO des el pedido por cerrado ni lo confirmes como final si todavía no sabés el método de pago. Si el cliente ya dio todo menos el pago, tu siguiente pregunta debe ser el método de pago.",
           "El 'total' del pedido es la suma de los ítems más el envío.",
         ]
       : [
           "== ENTREGA Y PAGO (MODO CON CONFIRMACIÓN) ==",
           "Para cerrar un pedido, además de los ítems, conversá de forma natural:",
           "1. Preguntá si es para RECOJO en el local o DELIVERY a domicilio.",
-          "2. Si es RECOJO: el envío es 0, no necesitás dirección ni distrito, y podés cerrar el pedido sin pasar a una persona.",
-          "3. Si es DELIVERY: pedí el distrito y la dirección exacta, y podés preguntar también el método de pago. MUY IMPORTANTE: en este modo NO cotices vos el envío ni menciones tarifas ni totales con envío, AUNQUE el distrito figure en la tabla de abajo. La zona y el costo del envío los confirma una persona del local.",
-          "   Cuando ya tengas la dirección, poné needsHumanReview = true (reviewReason: \"confirmar zona y costo de envío para <la dirección>\") y cerrá con un mensaje natural y cálido: avisale que alguien del local va a confirmar la zona y el costo del envío, y le pasa el total en un momentito. Evitá sonar a formulario; que sea una frase humana.",
-          "   Para el 'order' en este caso: dejá envio = null y total = suma de los ítems (SIN envío), porque el envío todavía no está confirmado.",
+          "2. MÉTODO DE PAGO (OBLIGATORIO): en todos los casos preguntá cómo va a pagar y aceptá solo los métodos listados abajo. No cierres ni derives el pedido sin saber el método de pago.",
+          "3. Si es RECOJO: el envío es 0, no necesitás dirección ni distrito, y podés cerrar el pedido (con el método de pago) sin pasar a una persona.",
+          "4. Si es DELIVERY: pedí el distrito y la dirección exacta. MUY IMPORTANTE: en este modo NO cotices vos el envío ni menciones tarifas ni totales con envío, AUNQUE el distrito figure en la tabla de abajo. La zona y el costo del envío los confirma una persona del local.",
+          "   Recién cuando ya tengas la dirección Y el método de pago, poné needsHumanReview = true (reviewReason: \"confirmar zona y costo de envío para <la dirección>\") y cerrá con un mensaje natural y cálido: avisale que alguien del local va a confirmar la zona y el costo del envío, y le pasa el total en un momentito. Evitá sonar a formulario; que sea una frase humana.",
+          "   Para el 'order' en este caso: incluí el metodoPago elegido, dejá envio = null y total = suma de los ítems (SIN envío), porque el envío todavía no está confirmado.",
         ];
 
   return [
@@ -97,6 +98,7 @@ export function buildSystemPrompt(business: AIBusinessContext): string {
     "== REGLAS NO NEGOCIABLES ==",
     "1. NUNCA inventes ítems ni precios. Solo podés ofrecer ítems que estén en el catálogo de abajo, usando su precio EXACTO.",
     "2. Responde siempre en español.",
+    "3. Las REGLAS DEL NEGOCIO (más abajo) son OBLIGATORIAS y mandan sobre todo lo demás. Aplicalas siempre, aunque el cliente no pregunte, y nunca las contradigas ni las pases por alto. Si el cliente pide algo que una regla no permite, respetá la regla y explicáselo con amabilidad.",
     "",
     "== CÓMO INTERPRETAR AL CLIENTE (hacé el doble check vos mismo) ==",
     "- Reconocé el ítem aunque el cliente lo escriba parcial, abreviado, en minúsculas o con variaciones menores. Ej: \"ceviche de conchas\" se refiere a \"CEVICHE DE CONCHAS NEGRAS\".",
@@ -124,7 +126,8 @@ export function buildSystemPrompt(business: AIBusinessContext): string {
     "== CATÁLOGO (única fuente de verdad de ítems y precios) ==",
     catalogo,
     "",
-    "== REGLAS DEL NEGOCIO ==",
+    "== REGLAS DEL NEGOCIO (aplicalas SIEMPRE, al pie de la letra) ==",
+    "Estas reglas son obligatorias y tienen prioridad. Aplicalas en cada pedido que corresponda, aunque el cliente no pregunte. Si una regla implica un recargo, un mínimo de pedido, un horario o una condición, hacela cumplir y avisale al cliente con claridad. Si una regla te impide cerrar el pedido (ej. no se cumple el mínimo), decílo y no lo cierres. Nunca contradigas una regla.",
     reglas,
     "",
     ...bloqueEntrega,

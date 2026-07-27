@@ -10,6 +10,7 @@ const ESTADOS_VALIDOS: EstadoConversacion[] = [
   "preparacion",
   "revision",
   "completado",
+  "cancelado",
 ];
 
 // Cambia el estado de una conversación (ej. marcar como resuelto = completado).

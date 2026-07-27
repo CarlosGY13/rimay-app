@@ -147,8 +147,12 @@ export function InsightsSection() {
     }
   }, []);
 
+  // Refresca cada 10s: los insights se generan de forma asíncrona al cerrar
+  // conversaciones, así aparecen solos sin recargar la página.
   useEffect(() => {
     fetchAggregation();
+    const interval = setInterval(fetchAggregation, 10000);
+    return () => clearInterval(interval);
   }, [fetchAggregation]);
 
   function handleAddRule(text: string) {
@@ -181,8 +185,8 @@ export function InsightsSection() {
         {!data || data.themes.length === 0 ? (
           <div className="rounded-xl border border-dashed border-violet-200 px-6 py-8 text-center">
             <p className="text-sm text-ink-400">
-              Aun no hay insights. Se generaran cuando marques conversaciones como
-              resueltas en el Inbox.
+              Aún no hay insights. Se generan cuando completás o cancelás
+              conversaciones en el Inbox (puede tardar unos segundos).
             </p>
           </div>
         ) : (

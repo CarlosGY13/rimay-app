@@ -109,6 +109,10 @@ export function appEstadoToDb(e: EstadoConversacion): DbStatus {
       return DbStatus.en_preparacion;
     case "revision":
       return DbStatus.requiere_revision;
+    case "preparando":
+      return DbStatus.preparando;
+    case "cancelado":
+      return DbStatus.cancelado;
     case "completado":
     default:
       return DbStatus.completado;
@@ -123,6 +127,10 @@ export function dbEstadoToApp(s: DbStatus): EstadoConversacion {
       return "preparacion";
     case DbStatus.requiere_revision:
       return "revision";
+    case DbStatus.preparando:
+      return "preparando";
+    case DbStatus.cancelado:
+      return "cancelado";
     case DbStatus.completado:
     default:
       return "completado";
@@ -235,6 +243,10 @@ export function dbConversationToApp(
   }
   if (!resumen) resumen = "Sin mensajes";
 
+  // Método de pago (si el pedido estructurado lo tiene).
+  const order = (conv.orderData ?? null) as { metodoPago?: string | null } | null;
+  const metodoPago = order?.metodoPago ?? null;
+
   return {
     id: conv.id,
     cliente: conv.customerName,
@@ -243,5 +255,6 @@ export function dbConversationToApp(
     minutosAtras,
     canal: dbCanalToApp(conv.channel),
     estado: dbEstadoToApp(conv.status),
+    metodoPago,
   };
 }

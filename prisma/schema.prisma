@@ -45,7 +45,9 @@ enum ConversationStatus {
   nuevo
   en_preparacion
   requiere_revision
+  preparando
   completado
+  cancelado
 }
 
 // Cómo resuelve el agente el envío a domicilio:

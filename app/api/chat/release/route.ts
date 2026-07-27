@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { releaseSession, conversationTenantId } from "@/lib/conversationStore";
+import { resumeSession, conversationTenantId } from "@/lib/conversationStore";
 import { requireSession } from "@/lib/auth/session";
 
 export async function POST(request: Request) {
@@ -32,12 +32,16 @@ export async function POST(request: Request) {
       );
     }
 
-    await releaseSession(sessionId);
+    // "Devolver a IA": reactiva la conversación (activa, no cerrada) para que el
+    // agente siga respondiendo CON el historial. NO la cerramos: cerrar la
+    // marcaría como terminal y el próximo mensaje arrancaría una sesión nueva,
+    // perdiendo el contexto del pedido en curso.
+    await resumeSession(sessionId);
 
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json(
-      { error: "Error liberando la sesión." },
+      { error: "Error devolviendo la sesión a la IA." },
       { status: 500 }
     );
   }

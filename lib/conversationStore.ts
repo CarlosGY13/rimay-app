@@ -52,6 +52,12 @@ export type WidgetSession = {
   updatedAt: number;
 };
 
+// Estados terminales: la conversación se cerró (pedido completado o cancelado).
+// El próximo mensaje del cliente arranca una sesión nueva.
+function isTerminal(status: DbStatus): boolean {
+  return status === DbStatus.completado || status === DbStatus.cancelado;
+}
+
 function toWidgetSession(
   conv: Conversation & { messages: Message[] }
 ): WidgetSession {
@@ -79,7 +85,10 @@ export async function getOrCreateSession(
       where: { id: sessionId },
       include: { messages: { orderBy: { createdAt: "asc" } } },
     });
-    if (existing) return toWidgetSession(existing);
+    // Si la sesión existe y NO está cerrada, la reutilizamos. Si ya terminó
+    // (completada/cancelada), creamos una nueva (el widget adoptará el id nuevo
+    // que devolvemos), así el cliente empieza de cero.
+    if (existing && !isTerminal(existing.status)) return toWidgetSession(existing);
   }
 
   const tenantId = await getFixedTenantId();
@@ -167,17 +176,21 @@ export async function getOrCreateExternalConversation(params: {
   customerName: string;
 }): Promise<{ id: string; paused: boolean }> {
   const tenantId = await getFixedTenantId();
-  const existing = await prisma.conversation.findFirst({
+  // Tomamos la conversación MÁS RECIENTE de ese chat. Si ya terminó
+  // (completada o cancelada), NO la reutilizamos: arrancamos una sesión nueva,
+  // así el agente no arrastra el historial de un pedido ya cerrado.
+  const latest = await prisma.conversation.findFirst({
     where: {
       tenantId,
       channel: params.channel,
       externalId: params.externalId,
     },
+    orderBy: { createdAt: "desc" },
   });
-  if (existing) {
+  if (latest && !isTerminal(latest.status)) {
     return {
-      id: existing.id,
-      paused: existing.status === DbStatus.en_preparacion,
+      id: latest.id,
+      paused: latest.status === DbStatus.en_preparacion,
     };
   }
 
@@ -214,6 +227,15 @@ export async function resumeSession(sessionId: string): Promise<void> {
   await prisma.conversation.update({
     where: { id: sessionId },
     data: { status: DbStatus.nuevo },
+  });
+}
+
+// Marca la conversación como cancelada (terminal). El próximo mensaje del
+// cliente arrancará una sesión nueva.
+export async function cancelSession(sessionId: string): Promise<void> {
+  await prisma.conversation.update({
+    where: { id: sessionId },
+    data: { status: DbStatus.cancelado },
   });
 }
 

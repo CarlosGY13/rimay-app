@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentType, type SVGProps } from "react";
 import RequireConfig from "@/app/components/RequireConfig";
 import PageHeader from "@/app/components/PageHeader";
-import { useBusiness } from "@/app/context/BusinessContext";
 import { useInboxMetrics } from "./useInboxMetrics";
 import { MetricsPanel } from "./MetricsPanel";
 import { HandoffPanel } from "./HandoffPanel";
@@ -25,25 +24,28 @@ import {
   CheckIcon,
 } from "@/app/components/icons";
 
-type Filtro = "activos" | "pendientes" | "revision" | "completado";
+type Filtro = "activos" | "pendientes" | "revision" | "completado" | "cancelado";
 
 const TABS: { value: Filtro; label: string }[] = [
   { value: "activos", label: "Activos" },
   { value: "pendientes", label: "Pendientes" },
   { value: "revision", label: "Requiere atención" },
-  { value: "completado", label: "Resueltos" },
+  { value: "completado", label: "Completados" },
+  { value: "cancelado", label: "Cancelados" },
 ];
 
 type EstadoMeta = {
   label: string;
-  tone: "info" | "warning" | "danger" | "success";
+  tone: "info" | "warning" | "danger" | "success" | "neutral";
 };
 
 const ESTADO_META: Record<EstadoConversacion, EstadoMeta> = {
   nuevo: { label: "Nuevo", tone: "info" },
-  preparacion: { label: "En preparación", tone: "warning" },
+  preparacion: { label: "Operador en control", tone: "warning" },
   revision: { label: "Requiere revisión", tone: "danger" },
+  preparando: { label: "En preparación", tone: "info" },
   completado: { label: "Completado", tone: "success" },
+  cancelado: { label: "Cancelado", tone: "neutral" },
 };
 
 const CANAL: Record<
@@ -72,45 +74,55 @@ function iniciales(nombre: string): string {
 }
 
 function InboxContent() {
-  const { conversaciones: contextConvs } = useBusiness();
   const [localOverrides, setLocalOverrides] = useState<
     Record<string, Partial<Conversacion>>
   >({});
   const [filtro, setFiltro] = useState<Filtro>("activos");
-  const [webConvs, setWebConvs] = useState<Conversacion[]>([]);
+  const [convs, setConvs] = useState<Conversacion[]>([]);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [panelSessionId, setPanelSessionId] = useState<string | null>(null);
 
-  // Poll /api/conversations every 3s for widget messages
-  const fetchWebConvs = useCallback(async () => {
+  // Fuente única: /api/conversations (Postgres). Se refresca cada 2s para que
+  // el inbox sea "en vivo" — nuevos mensajes, pedidos y cambios de estado
+  // aparecen solos, sin recargar la página.
+  const fetchConvs = useCallback(async () => {
     try {
       const res = await fetch("/api/conversations");
       if (res.ok) {
         const data = await res.json();
-        setWebConvs(data.conversations ?? []);
+        setConvs(data.conversations ?? []);
+        // Limpiamos los overrides optimistas que el servidor ya confirmó, para
+        // no arrastrar estado viejo.
+        setLocalOverrides((prev) => {
+          if (Object.keys(prev).length === 0) return prev;
+          const next = { ...prev };
+          let changed = false;
+          for (const c of data.conversations ?? []) {
+            const ov = next[c.id];
+            if (ov && ov.estado && ov.estado === c.estado) {
+              delete next[c.id];
+              changed = true;
+            }
+          }
+          return changed ? next : prev;
+        });
       }
     } catch {
-      // silent fail — polling will retry
+      // silent fail — el polling reintenta
     }
   }, []);
 
   useEffect(() => {
-    fetchWebConvs();
-    const interval = setInterval(fetchWebConvs, 3000);
+    fetchConvs();
+    const interval = setInterval(fetchConvs, 2000);
     return () => clearInterval(interval);
-  }, [fetchWebConvs]);
+  }, [fetchConvs]);
 
-  // Merge context conversations + web widget conversations (deduplicate by id)
   const conversaciones: Conversacion[] = useMemo(() => {
-    const contextWithOverrides = contextConvs.map((c) =>
-      localOverrides[c.id] ? { ...c, ...localOverrides[c.id] } : c
-    );
-    const contextIds = new Set(contextWithOverrides.map((c) => c.id));
-    const uniqueWeb = webConvs.filter((c) => !contextIds.has(c.id));
-    return [...contextWithOverrides, ...uniqueWeb].filter(
-      (c) => !removedIds.has(c.id)
-    );
-  }, [contextConvs, localOverrides, webConvs, removedIds]);
+    return convs
+      .map((c) => (localOverrides[c.id] ? { ...c, ...localOverrides[c.id] } : c))
+      .filter((c) => !removedIds.has(c.id));
+  }, [convs, localOverrides, removedIds]);
 
   const metrics = useInboxMetrics(conversaciones);
 
@@ -118,7 +130,9 @@ function InboxContent() {
     let lista: Conversacion[];
     switch (filtro) {
       case "activos":
-        lista = conversaciones.filter((c) => c.estado !== "completado");
+        lista = conversaciones.filter(
+          (c) => c.estado !== "completado" && c.estado !== "cancelado"
+        );
         break;
       case "pendientes":
         lista = conversaciones.filter(
@@ -130,6 +144,9 @@ function InboxContent() {
         break;
       case "completado":
         lista = conversaciones.filter((c) => c.estado === "completado");
+        break;
+      case "cancelado":
+        lista = conversaciones.filter((c) => c.estado === "cancelado");
         break;
       default:
         lista = conversaciones;
@@ -146,36 +163,73 @@ function InboxContent() {
   const conteoResueltos = conversaciones.filter(
     (c) => c.estado === "completado"
   ).length;
+  const conteoCancelados = conversaciones.filter(
+    (c) => c.estado === "cancelado"
+  ).length;
 
   function tomarChat(id: string) {
-    // For web conversations, open the handoff panel
-    const isWebConv = webConvs.some((c) => c.id === id);
-    if (isWebConv) {
-      setPanelSessionId(id);
-    } else {
-      // For context conversations (sandbox), just change state visually
-      setLocalOverrides((prev) => ({
-        ...prev,
-        [id]: { estado: "preparacion" },
-      }));
-    }
+    // Todas las conversaciones viven en la DB: abrimos el panel de handoff
+    // (toma el control y muestra el historial / motivo del caso).
+    setPanelSessionId(id);
   }
 
-  async function marcarResuelto(id: string) {
-    // Optimista: pasa a completado (sale de la vista "Activos").
-    setLocalOverrides((prev) => ({
-      ...prev,
-      [id]: { estado: "completado" },
-    }));
+  // Cambia el estado de una conversación de forma optimista (con rollback).
+  async function cambiarEstado(id: string, estado: EstadoConversacion) {
+    setLocalOverrides((prev) => ({ ...prev, [id]: { estado } }));
     try {
       const res = await fetch(`/api/conversations/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estado: "completado" }),
+        body: JSON.stringify({ estado }),
       });
       if (!res.ok) throw new Error();
     } catch {
-      // Revertir si falló
+      setLocalOverrides((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
+  }
+
+  // Genera el insight de una conversación cerrada (fire-and-forget). El
+  // servidor extrae el aprendizaje y actualiza la agregación de /resumen.
+  function dispararInsight(id: string) {
+    fetch("/api/insights/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId: id }),
+    }).catch(() => {
+      // silent — no bloquea el cierre de la conversación
+    });
+  }
+
+  // "En preparación": pedido aceptado, en preparación/envío. La IA sigue activa.
+  function marcarPreparando(id: string) {
+    cambiarEstado(id, "preparando");
+  }
+
+  // "Completar": cierra el chat (terminal). Próximo mensaje = sesión nueva.
+  function marcarCompletado(id: string) {
+    if (panelSessionId === id) setPanelSessionId(null);
+    cambiarEstado(id, "completado");
+    dispararInsight(id);
+  }
+
+  // "Cancelar": envía una despedida al cliente y cierra (terminal).
+  async function cancelarChat(id: string) {
+    setLocalOverrides((prev) => ({ ...prev, [id]: { estado: "cancelado" } }));
+    if (panelSessionId === id) setPanelSessionId(null);
+    try {
+      const res = await fetch("/api/chat/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: id }),
+      });
+      if (!res.ok) throw new Error();
+      // Conversación cerrada: generamos su insight.
+      dispararInsight(id);
+    } catch {
       setLocalOverrides((prev) => {
         const next = { ...prev };
         delete next[id];
@@ -223,6 +277,8 @@ function InboxContent() {
             badge = conteoRevision;
           if (tab.value === "completado" && conteoResueltos > 0)
             badge = conteoResueltos;
+          if (tab.value === "cancelado" && conteoCancelados > 0)
+            badge = conteoCancelados;
           return (
             <button
               key={tab.value}
@@ -305,6 +361,7 @@ function InboxContent() {
                       <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-100">
                         <CheckIcon className="h-3.5 w-3.5" />
                         Pedido confirmado · S/ {conv.total.toFixed(2)}
+                        {conv.metodoPago && <span>· Pago: {conv.metodoPago}</span>}
                       </div>
                     )}
 
@@ -332,21 +389,42 @@ function InboxContent() {
                               Ver chat
                             </Button>
                           )}
-                        {conv.estado !== "completado" && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => marcarResuelto(conv.id)}
-                          >
-                            Resolver
-                          </Button>
-                        )}
+                        {conv.estado !== "completado" &&
+                          conv.estado !== "cancelado" && (
+                            <>
+                              {conv.estado !== "preparando" && (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => marcarPreparando(conv.id)}
+                                  title="Pedido aceptado: en preparación / envío (la IA sigue atendiendo)"
+                                >
+                                  En preparación
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                onClick={() => marcarCompletado(conv.id)}
+                                title="Cerrar el chat: pedido completado"
+                              >
+                                Completar
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => cancelarChat(conv.id)}
+                                title="Cancelar: avisa al cliente y cierra el chat"
+                              >
+                                Cancelar
+                              </Button>
+                            </>
+                          )}
                         <button
                           type="button"
                           onClick={() => descartar(conv.id)}
                           className="rounded-lg p-2 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
                           aria-label="Descartar"
-                          title="Descartar"
+                          title="Descartar (quitar del inbox sin avisar al cliente)"
                         >
                           <TrashIcon className="h-4 w-4" />
                         </button>

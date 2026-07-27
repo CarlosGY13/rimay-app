@@ -39,7 +39,10 @@ export function useInboxMetrics(conversaciones: Conversacion[]): InboxMetrics {
 
     const tasaContencion = Math.round(((total - derivadosHumano) / total) * 100);
 
-    const conOrden = conversaciones.filter((c) => c.total > 0);
+    // Un pedido cancelado no cuenta como venta para pedidos/ticket promedio.
+    const conOrden = conversaciones.filter(
+      (c) => c.total > 0 && c.estado !== "cancelado"
+    );
     const pedidosHoy = conOrden.length;
 
     const ticketPromedio =

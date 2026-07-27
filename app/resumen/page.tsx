@@ -1,72 +1,100 @@
 "use client";
 
-import type { ComponentType, SVGProps } from "react";
+import { useCallback, useEffect, useState } from "react";
 import RequireConfig from "@/app/components/RequireConfig";
 import PageHeader from "@/app/components/PageHeader";
 import { Card } from "@/app/components/ui/Card";
-import { useBusiness } from "@/app/context/BusinessContext";
-import type { Rubro } from "@/lib/types";
-import { SparklesIcon, AlertIcon } from "@/app/components/icons";
+import type { Conversacion } from "@/lib/types";
+import { useInboxMetrics } from "@/app/inbox/useInboxMetrics";
+import {
+  SparklesIcon,
+  AlertIcon,
+  CheckIcon,
+  RocketIcon,
+} from "@/app/components/icons";
 import { InsightsSection } from "./InsightsSection";
 
-type MetricaRubro = {
-  resueltas: string; // % de conversaciones resueltas sin intervención humana
-  escalados: string; // casos escalados a revisión humana
-};
-
-// MOCK: reemplazar con métricas reales calculadas desde conversaciones/analytics.
-// Por ahora son valores fijos y plausibles según el rubro configurado.
-const METRICAS_POR_RUBRO: Record<Rubro, MetricaRubro> = {
-  restaurante: { resueltas: "82%", escalados: "5" },
-  ropa: { resueltas: "76%", escalados: "8" },
-  veterinaria: { resueltas: "68%", escalados: "11" },
-  belleza: { resueltas: "74%", escalados: "9" },
-  generico: { resueltas: "70%", escalados: "7" },
-};
-
-type TarjetaMeta = {
-  titulo: string;
-  descripcion: string;
-  valor: (m: MetricaRubro) => string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-  acento: string;
-  fondoIcono: string;
-};
-
-const TARJETAS: TarjetaMeta[] = [
-  {
-    titulo: "Resueltas sin intervención",
-    descripcion: "Conversaciones que el agente cerró solo, sin un humano.",
-    valor: (m) => m.resueltas,
-    icon: SparklesIcon,
-    acento: "text-brand-600",
-    fondoIcono: "bg-brand-50",
-  },
-  {
-    titulo: "Casos escalados a revisión",
-    descripcion: "Consultas que pasaron a un operador humano.",
-    valor: (m) => m.escalados,
-    icon: AlertIcon,
-    acento: "text-amber-600",
-    fondoIcono: "bg-amber-50",
-  },
-];
-
 function ResumenContent() {
-  const { config } = useBusiness();
-  const rubro: Rubro = config.rubro ?? "generico";
-  const metricas = METRICAS_POR_RUBRO[rubro];
+  const [convs, setConvs] = useState<Conversacion[]>([]);
+  const [cargado, setCargado] = useState(false);
+
+  // Métricas reales calculadas desde las conversaciones del tenant.
+  const fetchConvs = useCallback(async () => {
+    try {
+      const res = await fetch("/api/conversations");
+      if (res.ok) {
+        const data = await res.json();
+        setConvs(data.conversations ?? []);
+      }
+    } catch {
+      // silent — se reintenta en el próximo ciclo
+    } finally {
+      setCargado(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConvs();
+    const interval = setInterval(fetchConvs, 5000);
+    return () => clearInterval(interval);
+  }, [fetchConvs]);
+
+  const m = useInboxMetrics(convs);
+
+  const tarjetas = [
+    {
+      titulo: "Resueltas sin intervención",
+      descripcion: "Conversaciones que el agente manejó sin pasar a una persona.",
+      valor: `${m.tasaContencion}%`,
+      icon: SparklesIcon,
+      acento: "text-brand-600",
+      fondoIcono: "bg-brand-50",
+    },
+    {
+      titulo: "Casos que pasaron a una persona",
+      descripcion: "Conversaciones marcadas para revisión de un operador.",
+      valor: `${m.derivadosHumano}`,
+      icon: AlertIcon,
+      acento: "text-amber-600",
+      fondoIcono: "bg-amber-50",
+    },
+    {
+      titulo: "Pedidos confirmados",
+      descripcion: "Conversaciones que terminaron en un pedido con monto.",
+      valor: `${m.pedidosHoy}`,
+      icon: CheckIcon,
+      acento: "text-emerald-600",
+      fondoIcono: "bg-emerald-50",
+    },
+    {
+      titulo: "Ticket promedio",
+      descripcion: "Monto promedio de los pedidos confirmados.",
+      valor: `S/ ${m.ticketPromedio.toFixed(2)}`,
+      icon: RocketIcon,
+      acento: "text-ink-900",
+      fondoIcono: "bg-ink-100",
+    },
+  ];
+
+  const sinDatos = cargado && convs.length === 0;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
       <PageHeader
         eyebrow="Resumen"
         title="Impacto de tu agente"
-        description="Una vista simulada del valor que Rimay genera para tu negocio."
+        description="Métricas reales de tus conversaciones, en vivo."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {TARJETAS.map((t) => {
+      {sinDatos && (
+        <p className="mb-6 rounded-2xl border border-dashed border-ink-200 p-8 text-center text-sm text-ink-400">
+          Todavía no hay conversaciones. Las métricas se llenan a medida que tu
+          agente atiende clientes.
+        </p>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {tarjetas.map((t) => {
           const Icon = t.icon;
           return (
             <Card key={t.titulo} className="p-6">
@@ -76,7 +104,7 @@ function ResumenContent() {
                 <Icon className={`h-5 w-5 ${t.acento}`} />
               </div>
               <div className={`text-3xl font-semibold tracking-tight ${t.acento}`}>
-                {t.valor(metricas)}
+                {t.valor}
               </div>
               <div className="mt-2 text-sm font-medium text-ink-900">
                 {t.titulo}
@@ -88,11 +116,6 @@ function ResumenContent() {
           );
         })}
       </div>
-
-      <p className="mt-6 text-xs text-ink-400">
-        Datos simulados con fines de demostración. Se actualizarán con métricas
-        reales cuando el agente esté conectado a tus canales.
-      </p>
 
       {/* Insights de conversaciones — se llena al cerrar conversaciones */}
       <InsightsSection />

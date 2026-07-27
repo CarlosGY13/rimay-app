@@ -100,7 +100,9 @@ export default function WidgetPage() {
       });
       const data = await res.json();
 
-      if (data.sessionId && !sessionId) {
+      // Adoptamos el sessionId que devuelve el server. Si cambió (porque la
+      // sesión anterior se cerró y arrancó una nueva), tomamos el id nuevo.
+      if (data.sessionId && data.sessionId !== sessionId) {
         setSessionId(data.sessionId);
       }
 

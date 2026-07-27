@@ -82,9 +82,11 @@ export type CanalOrigen = "whatsapp" | "instagram" | "web" | "telegram";
 
 export type EstadoConversacion =
   | "nuevo"
-  | "preparacion"
+  | "preparacion" // operador en control (IA pausada)
   | "revision"
-  | "completado";
+  | "preparando" // pedido aceptado, preparándose/enviándose (IA sigue activa)
+  | "completado"
+  | "cancelado";
 
 export type Conversacion = {
   id: string;
@@ -94,6 +96,8 @@ export type Conversacion = {
   minutosAtras: number;
   canal: CanalOrigen;
   estado: EstadoConversacion;
+  // Método de pago del pedido (si el cliente ya lo eligió).
+  metodoPago?: string | null;
 };
 
 // ============================================================

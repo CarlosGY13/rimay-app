@@ -140,7 +140,7 @@ export async function POST(request: Request) {
       const recentInsights = await prisma.conversationInsight.findMany({
         where: { tenantId: session.tenantId },
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 20,
       });
 
       const existingRules = await prisma.businessRule.findMany({

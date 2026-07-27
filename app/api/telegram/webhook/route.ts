@@ -16,7 +16,9 @@ import { sendTelegramMessage, type TelegramUpdate } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
-const MAX_HISTORY = 10;
+// Ventana de historial que se pasa al modelo. Amplia para no perder el contexto
+// de pedidos largos (varios ítems + entrega + pago + intervención del operador).
+const MAX_HISTORY = 20;
 
 // Webhook de Telegram. Telegram hace POST acá con cada update. Validamos el
 // secret que configuramos en setWebhook (header x-telegram-bot-api-secret-token).
