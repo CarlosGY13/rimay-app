@@ -76,16 +76,19 @@ export async function PATCH(request: Request) {
       paymentMethods?: string[];
     };
 
-    // Normaliza métodos de pago: strings no vacíos, sin duplicados.
+    // Normaliza métodos de pago: strings no vacíos, sin duplicados
+    // (ignorando mayúsculas/minúsculas; se conserva la primera variante).
     const paymentMethods =
       body.paymentMethods !== undefined
-        ? Array.from(
-            new Set(
-              body.paymentMethods
-                .map((m) => (typeof m === "string" ? m.trim() : ""))
-                .filter((m) => m.length > 0)
-            )
-          )
+        ? body.paymentMethods
+            .map((m) => (typeof m === "string" ? m.trim() : ""))
+            .filter((m) => m.length > 0)
+            .reduce<string[]>((acc, m) => {
+              if (!acc.some((x) => x.toLowerCase() === m.toLowerCase())) {
+                acc.push(m);
+              }
+              return acc;
+            }, [])
         : undefined;
 
     await prisma.tenant.update({

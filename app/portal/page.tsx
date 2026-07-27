@@ -5,7 +5,7 @@ import RequireConfig from "@/app/components/RequireConfig";
 import PageHeader from "@/app/components/PageHeader";
 import { useBusiness } from "@/app/context/BusinessContext";
 import { getRubroDef } from "@/lib/rubros";
-import type { CatalogItem, Canales, Tono } from "@/lib/types";
+import type { CatalogItem, Tono } from "@/lib/types";
 import { Button } from "@/app/components/ui/Button";
 import { SectionCard } from "@/app/components/ui/Card";
 import { Badge } from "@/app/components/ui/Badge";
@@ -16,6 +16,7 @@ import {
   TrashIcon,
   CheckIcon,
   AlertIcon,
+  TelegramIcon,
   WhatsappIcon,
   InstagramIcon,
   FacebookIcon,
@@ -30,15 +31,20 @@ const TONOS: { value: Tono; label: string }[] = [
   { value: "juvenil", label: "Juvenil y divertido" },
 ];
 
+// Canales de mensajería. Hoy solo Telegram está integrado y operativo; el
+// resto se muestran como "próximamente" (no seleccionables) para no prometer
+// algo que aún no funciona.
 const CANALES: {
-  key: keyof Canales;
+  key: string;
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
+  conectado: boolean;
 }[] = [
-  { key: "whatsapp", label: "WhatsApp", icon: WhatsappIcon },
-  { key: "instagram", label: "Instagram", icon: InstagramIcon },
-  { key: "facebook", label: "Facebook", icon: FacebookIcon },
-  { key: "web", label: "Web", icon: GlobeIcon },
+  { key: "telegram", label: "Telegram", icon: TelegramIcon, conectado: true },
+  { key: "whatsapp", label: "WhatsApp", icon: WhatsappIcon, conectado: false },
+  { key: "instagram", label: "Instagram", icon: InstagramIcon, conectado: false },
+  { key: "facebook", label: "Facebook", icon: FacebookIcon, conectado: false },
+  { key: "web", label: "Web", icon: GlobeIcon, conectado: false },
 ];
 
 function PortalContent() {
@@ -46,7 +52,6 @@ function PortalContent() {
     config,
     setNombre,
     setTono,
-    toggleCanal,
     addItem,
     updateItem,
     removeItem,
@@ -120,6 +125,15 @@ function PortalContent() {
   function agregarPago() {
     const metodo = nuevoPago.trim();
     if (metodo.length === 0) return;
+    // No duplicar: si el método ya existe (ignorando mayúsculas/tildes de caja),
+    // no lo agregamos de nuevo ni lo quitamos por error.
+    const yaExiste = config.paymentMethods.some(
+      (m) => m.toLowerCase() === metodo.toLowerCase()
+    );
+    if (yaExiste) {
+      setNuevoPago("");
+      return;
+    }
     togglePago(metodo);
     setNuevoPago("");
   }
@@ -161,33 +175,40 @@ function PortalContent() {
 
           <div className="mt-5">
             <span className="mb-2 block text-sm font-medium text-ink-700">
-              Canales activos
+              Canales
             </span>
             <div className="flex flex-wrap gap-2">
               {CANALES.map((canal) => {
-                const activo = config.canales[canal.key];
                 const Icon = canal.icon;
                 return (
-                  <button
+                  <div
                     key={canal.key}
-                    type="button"
-                    onClick={() => toggleCanal(canal.key)}
                     className={[
-                      "inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition-all",
-                      activo
+                      "inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium",
+                      canal.conectado
                         ? "border-brand-300 bg-brand-50 text-brand-700 shadow-soft"
-                        : "border-ink-200 bg-white text-ink-400 hover:border-ink-300 hover:text-ink-600",
+                        : "border-ink-200 bg-ink-50/60 text-ink-400",
                     ].join(" ")}
                   >
                     <Icon className="h-4 w-4" />
                     {canal.label}
-                  </button>
+                    {canal.conectado ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-700">
+                        <CheckIcon className="h-3 w-3" />
+                        Conectado
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+                        Próximamente
+                      </span>
+                    )}
+                  </div>
                 );
               })}
             </div>
             <p className="mt-2 text-xs text-ink-400">
-              Las conexiones reales a cada canal se habilitarán en la fase de
-              integraciones.
+              Telegram ya está integrado y respondiendo. Los demás canales se
+              habilitarán más adelante.
             </p>
           </div>
         </SectionCard>
