@@ -189,6 +189,10 @@ model Conversation {
   status       ConversationStatus @default(nuevo)
   summary      String?
   totalAmount  Decimal?           @map("total_amount") @db.Decimal(10, 2)
+  // Pedido estructurado (items, tipo de entrega, distrito, dirección, envío,
+  // método de pago, total). Permite precargar la tarifa por distrito y armar el
+  // cierre con plantilla sin volver a pasar por la IA.
+  orderData    Json?              @map("order_data")
   // ID del hilo en el canal externo (ej. chat_id de Telegram) para correlacionar
   // los mensajes entrantes con su conversación.
   externalId   String?            @map("external_id")

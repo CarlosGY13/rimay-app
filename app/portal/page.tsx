@@ -206,10 +206,6 @@ function PortalContent() {
                 );
               })}
             </div>
-            <p className="mt-2 text-xs text-ink-400">
-              Telegram ya está integrado y respondiendo. Los demás canales se
-              habilitarán más adelante.
-            </p>
           </div>
         </SectionCard>
 

@@ -1,4 +1,5 @@
 import {
+  Prisma,
   Channel as DbChannel,
   ConversationStatus as DbStatus,
   type Conversation,
@@ -28,6 +29,18 @@ export type WidgetMessage = {
   texto: string;
 };
 
+// Pedido estructurado tal como se persiste en Conversation.orderData. Los
+// campos de delivery son opcionales porque los pedidos web (mock) no los traen.
+export type StoredOrder = {
+  items: { nombre: string; precio: number }[];
+  total: number;
+  tipoEntrega?: "recojo" | "delivery" | null;
+  distrito?: string | null;
+  direccion?: string | null;
+  envio?: number | null;
+  metodoPago?: string | null;
+};
+
 export type WidgetSession = {
   id: string;
   mensajes: WidgetMessage[];
@@ -35,6 +48,7 @@ export type WidgetSession = {
   total: number;
   estado: EstadoConversacion;
   paused: boolean;
+  order: StoredOrder | null;
   updatedAt: number;
 };
 
@@ -52,6 +66,7 @@ function toWidgetSession(
     estado: dbEstadoToApp(conv.status),
     // "pausado" (operador en control) se deriva del estado en_preparacion.
     paused: conv.status === DbStatus.en_preparacion,
+    order: (conv.orderData as StoredOrder | null) ?? null,
     updatedAt: conv.updatedAt.getTime(),
   };
 }
@@ -193,15 +208,58 @@ export async function releaseSession(sessionId: string): Promise<void> {
   });
 }
 
+// Devuelve el control a la IA dejando la conversación activa (no pausada, no
+// cerrada), para que el agente siga respondiendo los próximos mensajes.
+export async function resumeSession(sessionId: string): Promise<void> {
+  await prisma.conversation.update({
+    where: { id: sessionId },
+    data: { status: DbStatus.nuevo },
+  });
+}
+
 export async function updateOrderInfo(
   sessionId: string,
   resumen: string,
-  total: number
+  total: number,
+  order?: StoredOrder | null
 ): Promise<void> {
   await prisma.conversation.update({
     where: { id: sessionId },
-    data: { summary: resumen, totalAmount: total },
+    data: {
+      summary: resumen,
+      totalAmount: total,
+      // Solo tocamos orderData si nos pasan el pedido estructurado.
+      ...(order !== undefined
+        ? { orderData: (order ?? Prisma.JsonNull) as Prisma.InputJsonValue }
+        : {}),
+    },
   });
+}
+
+// Sugiere la tarifa de envío para una conversación: si su pedido es delivery a
+// un distrito que está en la tabla de zonas del tenant, devuelve esa tarifa.
+// Sirve para precargar el campo de confirmación del operador.
+export async function suggestedDeliveryFee(
+  sessionId: string
+): Promise<number | null> {
+  const conv = await prisma.conversation.findUnique({
+    where: { id: sessionId },
+    select: { tenantId: true, orderData: true },
+  });
+  if (!conv) return null;
+
+  const order = (conv.orderData as StoredOrder | null) ?? null;
+  const distrito = order?.distrito?.trim();
+  if (!distrito) return null;
+
+  const zone = await prisma.deliveryZone.findFirst({
+    where: {
+      tenantId: conv.tenantId,
+      distrito: { equals: distrito, mode: "insensitive" },
+    },
+    select: { fee: true },
+  });
+  return zone ? Number(zone.fee) : null;
 }
 
 export async function getAllSessions(): Promise<WidgetSession[]> {

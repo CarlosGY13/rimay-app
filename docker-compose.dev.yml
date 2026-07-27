@@ -70,6 +70,29 @@ services:
     networks:
       - rimay
 
+  # Poller de Telegram (solo desarrollo). Consulta Telegram con getUpdates y
+  # reenvía cada mensaje al webhook de la app. Evita necesitar un túnel público:
+  # no hay URL que exponer ni webhook que registrar. Si no hay token/secret en
+  # el .env, el poller queda inactivo (no molesta).
+  telegram-poller:
+    image: node:18-bookworm-slim
+    working_dir: /app
+    command: sh -lc "node scripts/telegram-poller.mjs"
+    restart: unless-stopped
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      # Endpoint interno de la app dentro de la red de Docker.
+      APP_WEBHOOK_URL: http://app:3000/api/telegram/webhook
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - app
+    networks:
+      - rimay
+
 volumes:
   postgres_data:
 

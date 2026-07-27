@@ -27,7 +27,10 @@ export function HandoffPanel({ sessionId, onClose }: Props) {
   const [texto, setTexto] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [fee, setFee] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const hasPaused = useRef(false);
+  const feePrefilled = useRef(false);
   const finRef = useRef<HTMLDivElement>(null);
 
   const fetchHistory = useCallback(async () => {
@@ -48,6 +51,17 @@ export function HandoffPanel({ sessionId, onClose }: Props) {
         setMensajes(data.mensajes ?? []);
         setPaused(data.paused ?? false);
         setResumen(data.resumen ?? "");
+        // Precarga la tarifa sugerida del distrito una sola vez, sin pisar lo
+        // que el operador haya empezado a escribir.
+        if (
+          !feePrefilled.current &&
+          typeof data.suggestedFee === "number"
+        ) {
+          feePrefilled.current = true;
+          setFee((actual) =>
+            actual.trim().length === 0 ? String(data.suggestedFee) : actual
+          );
+        }
       }
     } catch {
       // silent
@@ -108,6 +122,32 @@ export function HandoffPanel({ sessionId, onClose }: Props) {
       // silent
     }
     onClose();
+  }
+
+  // Confirma el costo de envío validado por la persona: la IA redacta el cierre
+  // (envío + total), se lo manda al cliente y retoma el control de la conversación.
+  async function confirmarEnvio() {
+    const monto = parseFloat(fee.replace(",", "."));
+    if (!Number.isFinite(monto) || monto < 0 || confirming) return;
+
+    setConfirming(true);
+    try {
+      const res = await fetch("/api/chat/confirm-delivery", {
+        method: "POST",
+        headers: operatorHeaders(),
+        body: JSON.stringify({ sessionId, fee: monto }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMensajes(data.mensajes ?? []);
+        setPaused(data.paused ?? false);
+        setFee("");
+      }
+    } catch {
+      await fetchHistory();
+    } finally {
+      setConfirming(false);
+    }
   }
 
   return (
@@ -231,13 +271,52 @@ export function HandoffPanel({ sessionId, onClose }: Props) {
               <SendIcon className="h-4 w-4" />
             </Button>
           </div>
+          {/* Confirmar envío (modo confirmación de delivery): la persona valida
+              la zona y pone el costo; la IA cierra el pedido y retoma. */}
+          <div className="mb-2 rounded-xl border border-ink-200 bg-ink-50/60 p-3">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-ink-400">
+              Confirmar envío
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">
+                  S/
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={fee}
+                  onChange={(e) => setFee(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") confirmarEnvio();
+                  }}
+                  placeholder="Costo de envío"
+                  className="w-full rounded-xl border border-ink-200 bg-white py-2.5 pl-9 pr-3 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={confirmarEnvio}
+                disabled={confirming || fee.trim().length === 0}
+                className="h-10 whitespace-nowrap"
+              >
+                {confirming ? "Confirmando…" : "Confirmar y devolver a IA"}
+              </Button>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-snug text-ink-400">
+              La IA le confirma al cliente el envío y el total, y retoma la
+              conversación.
+            </p>
+          </div>
+
           <Button
             variant="secondary"
             size="sm"
             onClick={devolverAIA}
             className="w-full"
           >
-            Devolver a IA
+            Devolver a IA (sin cerrar pedido)
           </Button>
         </div>
       </div>

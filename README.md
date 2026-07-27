@@ -114,29 +114,26 @@ TELEGRAM_BOT_TOKEN=<el token de BotFather>
 TELEGRAM_WEBHOOK_SECRET=<una cadena aleatoria cualquiera>
 ```
 
-Reiniciá la app para que tome las variables.
+### 3. Usar el bot en local (no necesitás nada más)
 
-### 3. Exponer el webhook
+En desarrollo, el bot funciona por **polling**: un servicio incluido en el compose (`telegram-poller`) consulta a Telegram y le pasa cada mensaje a la app. **No hace falta túnel, ni URL pública, ni registrar nada.**
 
-Telegram necesita una URL pública HTTPS que apunte a `/api/telegram/webhook`.
-
-- **En producción**: es directamente la URL de tu deploy, ej. `https://tu-dominio.com/api/telegram/webhook`.
-- **En local, sin instalar nada (usando Docker)**: con la app ya corriendo, levantá un túnel gratis en un contenedor:
-
-  ```bash
-  docker run --rm --network rimay-app_rimay cloudflare/cloudflared:latest tunnel --url http://app:3000
-  ```
-
-  Imprime una URL tipo `https://algo-al-azar.trycloudflare.com`. Copiala. Dejá esa terminal abierta mientras uses el bot. (La URL cambia cada vez que reiniciás el túnel, así que hay que repetir el paso 4.)
-
-### 4. Registrar el webhook en Telegram
-
-Una sola vez (reemplazá el token, la URL y el secret):
+Con las variables del paso 2 puestas, simplemente (re)levantá el stack:
 
 ```bash
-curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL_PUBLICA>/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+docker compose -f docker-compose.dev.yml up
 ```
 
-Listo: escribile a tu bot en Telegram y debería responder con la info de tu catálogo. Las conversaciones aparecen en `/inbox`.
+Escribile a tu bot en Telegram y debería responder con la info de tu catálogo. Las conversaciones aparecen en `/inbox`. Si no configuraste el token, el poller queda inactivo y no molesta.
+
+> Por qué polling en local: el webhook exige una URL pública HTTPS, lo que en local obliga a un túnel que rota de dirección y hay que re-registrar cada vez. El polling evita todo eso. La lógica de procesamiento es la misma que en producción (el poller reenvía al mismo endpoint `/api/telegram/webhook`).
+
+### 4. En producción: webhook
+
+En un deploy con dominio fijo conviene el webhook (más eficiente que el polling). No levantes el poller; en su lugar registrá el webhook una sola vez:
+
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://tu-dominio.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+```
 
 > El webhook valida el `secret_token` en cada request (header `x-telegram-bot-api-secret-token`), así nadie más puede dispararlo.

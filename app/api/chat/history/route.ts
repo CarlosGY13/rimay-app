@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/conversationStore";
+import { getSession, suggestedDeliveryFee } from "@/lib/conversationStore";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,10 @@ export async function GET(request: Request) {
     );
   }
 
+  // Tarifa sugerida para el envío: si el pedido es delivery a un distrito de la
+  // tabla, se usa para precargar el campo de confirmación del operador.
+  const suggestedFee = await suggestedDeliveryFee(sessionId);
+
   return NextResponse.json({
     sessionId: session.id,
     mensajes: session.mensajes,
@@ -31,5 +35,6 @@ export async function GET(request: Request) {
     // Motivo/resumen (p. ej. por qué se escaló a revisión). Útil cuando la
     // conversación no tiene mensajes (caso escalado desde el sandbox).
     resumen: session.resumen,
+    suggestedFee,
   });
 }

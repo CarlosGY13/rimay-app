@@ -78,7 +78,10 @@ export async function POST(request: Request) {
 
     if (response.order) {
       const resumen = response.order.items.map((i) => i.nombre).join(", ");
-      await updateOrderInfo(session.id, resumen, response.order.total);
+      await updateOrderInfo(session.id, resumen, response.order.total, {
+        items: response.order.items,
+        total: response.order.total,
+      });
     }
 
     return NextResponse.json({

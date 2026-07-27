@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server";
 import { Channel } from "@prisma/client";
-import { prisma } from "@/lib/db";
-import {
-  getFixedTenant,
-  dbRubroToApp,
-  dbTonoToApp,
-  dbCatalogItemToApp,
-} from "@/lib/tenant";
+import { getFixedTenantId } from "@/lib/tenant";
 import {
   getOrCreateExternalConversation,
   getSession,
@@ -15,80 +9,14 @@ import {
   updateOrderInfo,
 } from "@/lib/conversationStore";
 import { generarRespuestaIA } from "@/lib/ai/engine";
-import type { AIBusinessContext, AIMessage, AIResponse } from "@/lib/ai/provider";
+import { loadBusinessContext } from "@/lib/ai/businessContext";
+import { buildOrderSummary } from "@/lib/ai/orderSummary";
+import type { AIMessage } from "@/lib/ai/provider";
 import { sendTelegramMessage, type TelegramUpdate } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
 const MAX_HISTORY = 10;
-
-// Carga el contexto de negocio (tenant fijo) para el motor de IA.
-async function loadBusinessContext(): Promise<AIBusinessContext> {
-  const tenant = await getFixedTenant();
-  const [catalogo, reglas, zonas] = await Promise.all([
-    prisma.catalogItem.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.businessRule.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.deliveryZone.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { distrito: "asc" },
-    }),
-  ]);
-
-  return {
-    nombre: tenant.name.trim().length > 0 ? tenant.name : "el negocio",
-    rubro: dbRubroToApp(tenant.rubro),
-    tono: dbTonoToApp(tenant.tono),
-    catalogo: catalogo.map((c) => {
-      const item = dbCatalogItemToApp(c);
-      return {
-        nombre: item.nombre,
-        precio: item.precio,
-        descripcion: item.descripcion,
-        categoria: item.categoria,
-        tallas: item.tallas,
-        color: item.color,
-        duracion: item.duracion,
-      };
-    }),
-    reglas: reglas.map((r) => r.text),
-    deliveryMode: tenant.deliveryMode,
-    paymentMethods: tenant.paymentMethods,
-    zonas: zonas.map((z) => ({ distrito: z.distrito, fee: Number(z.fee) })),
-  };
-}
-
-// Arma un resumen legible del pedido para el operador (inbox): ítems, tipo de
-// entrega, distrito/dirección, método de pago y desglose de envío.
-function buildOrderSummary(order: NonNullable<AIResponse["order"]>): string {
-  const partes: string[] = [];
-
-  const items = order.items
-    .map((i) => `${i.nombre} (S/ ${i.precio.toFixed(2)})`)
-    .join(", ");
-  partes.push(items);
-
-  if (order.tipoEntrega === "recojo") {
-    partes.push("Entrega: recojo en local");
-  } else if (order.tipoEntrega === "delivery") {
-    const destino = [order.distrito, order.direccion]
-      .filter((x): x is string => !!x)
-      .join(" - ");
-    partes.push(`Entrega: delivery${destino ? ` a ${destino}` : ""}`);
-    if (order.envio !== null) {
-      partes.push(`Envío: S/ ${order.envio.toFixed(2)}`);
-    }
-  }
-
-  if (order.metodoPago) partes.push(`Pago: ${order.metodoPago}`);
-
-  return partes.join(" · ");
-}
 
 // Webhook de Telegram. Telegram hace POST acá con cada update. Validamos el
 // secret que configuramos en setWebhook (header x-telegram-bot-api-secret-token).
@@ -139,7 +67,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    const business = await loadBusinessContext();
+    const business = await loadBusinessContext(await getFixedTenantId());
     const res = await generarRespuestaIA({ message: text, history, business });
 
     await addMessage(conv.id, "agent", res.text);
@@ -149,7 +77,8 @@ export async function POST(request: Request) {
       await updateOrderInfo(
         conv.id,
         buildOrderSummary(res.order),
-        res.order.total
+        res.order.total,
+        res.order
       );
     }
     if (res.needsHumanReview) {
