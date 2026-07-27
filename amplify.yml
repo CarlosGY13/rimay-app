@@ -7,6 +7,7 @@ frontend:
         - npx prisma generate
     build:
       commands:
+        - env | grep -e AI_PROVIDER -e DATABASE_URL -e GEMINI_API_KEY -e GEMINI_MODEL -e OPENAI_API_KEY -e OPENAI_MODEL -e SESSION_SECRET -e TELEGRAM_BOT_TOKEN -e TELEGRAM_WEBHOOK_SECRET >> .env.production
         - npx prisma migrate deploy
         - npm run build
   artifacts:
