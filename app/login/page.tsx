@@ -43,10 +43,10 @@ export default function LoginPage() {
             R
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink-900">
-            Ingresá a Rimay
+            Ingresa a Rimay
           </h1>
           <p className="mt-1.5 text-sm text-ink-500">
-            Accedé al panel de tu negocio.
+            Accede al panel de tu negocio.
           </p>
         </div>
 

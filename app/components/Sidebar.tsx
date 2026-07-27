@@ -167,7 +167,7 @@ export default function Sidebar() {
         </button>
         <div className="flex items-center gap-2 text-[11px] font-medium text-ink-400">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          Entorno demo · datos simulados
+          Production
         </div>
       </div>
     </aside>
