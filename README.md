@@ -1,139 +1,74 @@
-# Rimay
+<h1 align="center">Rimay</h1>
+<p align="center">
+  <img src="https://drive.google.com/thumbnail?id=11ajc1cBw8rbZjO0z_gWqApwImRLhUu2A&sz=w1000" alt="Rimay" width="180" />
+</p>
+<p align="center"><em>"Hablar" en quechua — un agente de atención al cliente con IA para pymes de comida.</em></p>
 
-Rimay es un agente de atención al cliente configurable para pymes (piloto: restaurantes y pollerías). El dueño del negocio configura su catálogo, reglas y tono desde un panel, en lenguaje natural, y un agente de IA atiende a los clientes respondiendo **solo** con lo que hay en ese catálogo.
+<p align="center">
+  <a href="https://main.d39xfi82w5dpxo.amplifyapp.com"><strong>🔗 Ver demo en vivo</strong></a>
+  ·
+  <a href="https://www.youtube.com/watch?v=V0gKkWqEYWE"><strong>▶️ Ver video de presentación</strong></a>
+</p>
 
-## Stack
+---
 
-- **Next.js** (App Router) + **TypeScript** + **Tailwind**
-- **PostgreSQL** + **Prisma**
-- **IA**: OpenAI o Google Gemini (configurable por variable de entorno)
-- Todo corre en **Docker**
+## El problema
 
-## Requisitos
+En Perú existen más de 13,000 pollerías (8,000 solo en Lima), y el peruano tiene el mayor consumo per cápita de pollo de Latinoamérica. Estos negocios reciben pedidos simultáneos por WhatsApp, Instagram, Facebook y web, pero operan con equipos muy chicos (un par de cocineros, algunos meseros) y no dan abasto para responder cada consulta — perdiendo clientes que estaban listos para comprar. Las apps de delivery tradicionales "resuelven" esto, pero cobran hasta 30% de comisión.
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (incluye Docker Compose)
-- Una API key de **OpenAI** o de **Gemini**
+## La solución
 
-## Puesta en marcha
+**Rimay** le permite a cualquier pyme personalizar un agente de atención al cliente con IA **sin escribir una sola línea de código**: el dueño sube una foto de su carta (la IA extrae productos y precios automáticamente), define reglas de negocio en español simple, y el agente empieza a atender por chat web y Telegram, respondiendo únicamente con datos reales de su catálogo (sin alucinaciones). Cuando un caso no puede resolverse solo, escala a un operador humano en segundos.
 
-### 1. Variables de entorno
+---
 
-```bash
-cp .env.example .env
-```
+## 🧪 Probar la demo
 
-Editá `.env` y completá:
+**URL:** [https://main.d39xfi82w5dpxo.amplifyapp.com](https://main.d39xfi82w5dpxo.amplifyapp.com)
 
-- `AI_PROVIDER` → `openai` o `gemini`
-- `OPENAI_API_KEY` **o** `GEMINI_API_KEY` (según el proveedor elegido)
-- `SESSION_SECRET` → cualquier cadena larga y aleatoria (para firmar la sesión)
+**Credenciales del panel del dueño:**
 
-Las variables de Postgres ya vienen con valores por defecto que funcionan tal cual.
+| Campo | Valor |
+|---|---|
+| Correo | `dueno@saboresdelvalle.pe` |
+| Contraseña | `rimay1234` |
 
-### 2. Levantar la app (modo desarrollo, con recarga en caliente)
+> ⚠️ **Nota sobre la IA:** esta demo corre con una API key de Gemini de nivel gratuito, con límite de solicitudes por minuto. Si el agente responde con un mensaje genérico como *"Dame un momento…"*, es porque se alcanzó momentáneamente ese límite — se resuelve solo en menos de un minuto, sin ninguna acción adicional. Agradecemos reintentar pasado ese breve lapso.
 
-```bash
-docker compose -f docker-compose.dev.yml up
-```
+### Qué vas a encontrar al entrar
 
-Instala dependencias, aplica las migraciones de la base y arranca el server en **http://localhost:3000**. Al guardar un archivo, los cambios se reflejan al instante (hot reload). La primera vez tarda un poco más porque instala dependencias.
+| Sección | Qué hace |
+|---|---|
+| **`/portal`** | Panel del dueño: catálogo (con extracción automática desde foto), reglas de negocio en lenguaje natural, tono del agente, canales activos. |
+| **`/sandbox`** | Probar al agente como si fueras un cliente, antes de exponerlo al público. |
+| **`/inbox`** | Conversaciones entrantes (web + Telegram) y casos escalados a revisión humana. |
+| **`/resumen`** | Métricas de impacto del agente. |
 
-### 3. Cargar datos de ejemplo (una sola vez)
+Recomendación de recorrido: entrá con las credenciales de arriba → mirá el catálogo en `/portal` → probá una conversación en `/sandbox` → si tenés Telegram, escribile al bot (te lo mostramos en el video) y mirá cómo aparece en `/inbox`.
 
-En otra terminal, con la app corriendo:
+---
 
-```bash
-docker compose -f docker-compose.dev.yml exec app npx prisma db seed
-```
+## 🏗️ Arquitectura y stack
 
-Crea un negocio de ejemplo ("Sabores del Valle") y un usuario para entrar.
+- **Next.js 14** (App Router) + **TypeScript** — monolito moderno, sin microservicios innecesarios.
+- **PostgreSQL multi-tenant** (una sola base sirve múltiples negocios de forma aislada), gestionada con **Prisma**, hosteada en **Neon** (serverless, misma región de AWS).
+- **IA intercambiable**: Gemini Flash u OpenAI GPT-4o-mini, configurable por variable de entorno. Todas las respuestas de catálogo se fuerzan a schemas JSON estrictos validados contra la base de datos — la IA no inventa productos ni precios.
+- **Canales**: widget web embebible + bot de Telegram vía webhooks nativos.
+- **Human-in-the-Loop**: fallback automático a un operador humano ante un caso no cubierto por las reglas, o ante timeout/anomalía de la IA.
+- **Insight Engine**: analiza conversaciones con fricción y sugiere nuevas reglas de negocio al dueño, aprobables con un clic.
 
-### 4. Entrar
+### AWS y Kiro
 
-Abrí **http://localhost:3000/login** e ingresá con:
+- Desplegado en producción sobre **AWS Amplify Hosting** (SSR de Next.js), con pipeline de CI/CD conectado directo a este repositorio de GitHub.
+- Base de datos en **Neon (PostgreSQL)**, en la misma región de AWS (us-east-1).
+- Todo el desarrollo fue acelerado de principio a fin con **Kiro**, usando su flujo de especificaciones estructuradas (*specs*) y archivos de orientación (*steering files*) para iterar rápido sin sacrificar calidad de código.
 
-- Correo: `dueno@saboresdelvalle.pe`
-- Contraseña: `rimay1234`
+---
 
-## Modos de correr
+## 📚 Documentación técnica
 
-| Modo | Comando | Para qué |
-| --- | --- | --- |
-| Desarrollo (hot reload) | `docker compose -f docker-compose.dev.yml up` | Día a día. Cambios en vivo, sin rebuild. |
-| Build de producción | `docker compose up --build` | Verificar la imagen optimizada antes de desplegar. |
+Este README está pensado para evaluación del producto. Si querés levantar el proyecto en local, ver el modelo de datos completo, o entender la configuración de Docker, revisá **[DEVELOPMENT.md](DEVELOPMENT.md)**.
 
-> No corras los dos modos a la vez: ambos usan los puertos 3000 y 5432. Para cambiar de uno a otro, bajá el que esté corriendo (`docker compose down` o `docker compose -f docker-compose.dev.yml down`) y levantá el otro. Comparten el mismo volumen de datos de Postgres, así que la base se conserva.
+---
 
-## Variables de entorno
-
-| Variable | Descripción | Default |
-| --- | --- | --- |
-| `AI_PROVIDER` | Proveedor de IA: `openai` o `gemini` | `openai` |
-| `OPENAI_API_KEY` | API key de OpenAI (si usás `openai`) | — |
-| `GEMINI_API_KEY` | API key de Gemini (si usás `gemini`) | — |
-| `OPENAI_MODEL` / `GEMINI_MODEL` | Modelo a usar (opcional) | `gpt-4o-mini` / `gemini-2.5-flash` |
-| `SESSION_SECRET` | Secreto para firmar la sesión (cadena larga aleatoria) | — |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Credenciales de Postgres | `rimay` / `rimay_local_password` / `rimay` |
-| `DATABASE_URL` | Conexión a Postgres (herramientas locales) | apunta a `localhost:5432` |
-
-> El plan gratuito de Gemini limita las requests por día; si empezás a ver respuestas genéricas ("Dame un momento…"), probablemente agotaste la cuota. Cambiar `AI_PROVIDER=openai` o esperar el reset lo soluciona.
-
-## Cómo está organizado
-
-**Panel del dueño** (requiere login):
-
-- `/portal` — configura el negocio: catálogo, reglas y tono. Podés subir una foto de la carta y la IA extrae los platos y precios.
-- `/sandbox` — probá el agente como si fueras un cliente.
-- `/inbox` — conversaciones entrantes y casos que el agente escaló a una persona.
-- `/resumen` — métricas de impacto del agente.
-
-**Público** (cliente final): `/` (landing), `/widget` (burbuja de chat embebible) y `/demo-cliente` (sitio de ejemplo con el widget).
-
-## Base de datos
-
-El modelo vive en `prisma/schema.prisma` (multi-tenant: una sola base con `tenant_id` en cada tabla de negocio). En modo desarrollo las migraciones se aplican solas al levantar. Comandos útiles (dentro del contenedor con `docker compose -f docker-compose.dev.yml exec app ...`):
-
-- `npx prisma migrate deploy` — aplica migraciones pendientes
-- `npx prisma db seed` — carga los datos de ejemplo
-- `npx prisma studio` — explorador visual de la base
-
-## Integración con Telegram (opcional)
-
-El agente puede atender por un bot de Telegram. Los mensajes del cliente pasan por el mismo motor de IA (con tu catálogo) y las conversaciones aparecen en el Inbox como canal **Telegram**; si el agente necesita ayuda, quedan para revisión y un operador puede tomarlas.
-
-### 1. Crear el bot
-
-En Telegram, hablale a [@BotFather](https://t.me/BotFather), enviá `/newbot`, seguí los pasos y copiá el **token** que te da.
-
-### 2. Configurar el token
-
-En `.env`:
-
-```
-TELEGRAM_BOT_TOKEN=<el token de BotFather>
-TELEGRAM_WEBHOOK_SECRET=<una cadena aleatoria cualquiera>
-```
-
-### 3. Usar el bot en local (no necesitás nada más)
-
-En desarrollo, el bot funciona por **polling**: un servicio incluido en el compose (`telegram-poller`) consulta a Telegram y le pasa cada mensaje a la app. **No hace falta túnel, ni URL pública, ni registrar nada.**
-
-Con las variables del paso 2 puestas, simplemente (re)levantá el stack:
-
-```bash
-docker compose -f docker-compose.dev.yml up
-```
-
-Escribile a tu bot en Telegram y debería responder con la info de tu catálogo. Las conversaciones aparecen en `/inbox`. Si no configuraste el token, el poller queda inactivo y no molesta.
-
-> Por qué polling en local: el webhook exige una URL pública HTTPS, lo que en local obliga a un túnel que rota de dirección y hay que re-registrar cada vez. El polling evita todo eso. La lógica de procesamiento es la misma que en producción (el poller reenvía al mismo endpoint `/api/telegram/webhook`).
-
-### 4. En producción: webhook
-
-En un deploy con dominio fijo conviene el webhook (más eficiente que el polling). No levantes el poller; en su lugar registrá el webhook una sola vez:
-
-```bash
-curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://tu-dominio.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
-```
-
-> El webhook valida el `secret_token` en cada request (header `x-telegram-bot-api-secret-token`), así nadie más puede dispararlo.
+<p align="center"><em>Rimay le devuelve el control, el margen y la rapidez de atención a miles de pymes en Latinoamérica.</em></p>
